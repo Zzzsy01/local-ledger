@@ -1,5 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
-import { PAGE } from './rules.js';
+import { PAGE } from '../domain/rules.js';
 
 export async function createPdf(images, layout) {
   const pdf = await PDFDocument.create();

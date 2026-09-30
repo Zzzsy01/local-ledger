@@ -25,6 +25,24 @@ export function formatMoney(cents) {
   return cents == null ? '' : `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 }
 
+export function getAmountState(images, manualAmount) {
+  const taobao = images.find((image) => image.role === 'taobao');
+  const paymentCents = images.find((image) => image.role === 'payment')?.paymentCents ?? null;
+  const manual = manualAmount !== null;
+  const cents = manual ? parseMoney(manualAmount) : taobao?.taobaoCents ?? null;
+  return {
+    value: manual ? manualAmount : formatMoney(cents),
+    invalid: manual && manualAmount.trim() !== '' && cents === null,
+    source: taobao && cents === null ? 'unknown' : manual ? 'manual' : taobao ? 'recognized' : 'none',
+    paymentCents,
+    differs: cents !== null && paymentCents !== null && cents !== paymentCents,
+  };
+}
+
+export function hasRequiredRoles(images) {
+  return images.length === 3 && ROLES.every((role) => images.filter((image) => image.role === role).length === 1);
+}
+
 export function parseRecognizedAmount(text, role) {
   const value = compact(text);
   // Taobao's dropdown chevron can be recognized as a trailing dash. Bills use a leading debit sign.
@@ -53,7 +71,7 @@ export function findAmountRegion(role, ocr) {
 export const PAGE = { width: 595.32, height: 841.92, x: 90, y: 72, widthInside: 415.32, heightInside: 697.92, gap: 8, shotWidth: 185, shotHeight: 410.69 };
 
 export function makeLayout(images) {
-  if (images.length !== 3 || !ROLES.every((role) => images.filter((i) => i.role === role).length === 1)) {
+  if (!hasRequiredRoles(images)) {
     throw new Error('请分别确认一张发票、一张淘宝截图和一张支付截图。');
   }
   if (images.some((i) => !Number.isFinite(i.width) || !Number.isFinite(i.height) || i.width <= 0 || i.height <= 0)) {

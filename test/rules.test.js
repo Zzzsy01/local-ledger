@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, parseMoney, parseRecognizedAmount, formatMoney, findAmountRegion, makeLayout, PAGE } from '../src/rules.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { classify, parseMoney, parseRecognizedAmount, formatMoney, findAmountRegion, getAmountState, makeLayout, PAGE } from '../src/domain/rules.js';
+
+test('layer imports keep UI, application, domain and infrastructure boundaries', () => {
+  const root = fileURLToPath(new URL('../src/', import.meta.url));
+  const allowed = { ui: ['ui', 'domain'], application: ['application', 'domain', 'infrastructure'], domain: ['domain'], infrastructure: ['infrastructure', 'domain'] };
+  for (const [layer, targets] of Object.entries(allowed)) {
+    for (const name of readdirSync(path.join(root, layer), { recursive: true }).filter((name) => name.endsWith('.js'))) {
+      const filename = path.join(root, layer, name), source = readFileSync(filename, 'utf8');
+      for (const [, dependency] of source.matchAll(/\b(?:from|import)\s*['"]([^'"]+)['"]/g)) {
+        if (!dependency.startsWith('.')) assert.equal(layer, 'infrastructure', `${filename}: library ${dependency} belongs in infrastructure`);
+        else {
+          const target = path.relative(root, path.resolve(path.dirname(filename), dependency)).split(path.sep)[0];
+          assert.ok(targets.includes(target), `${layer} must not import ${dependency}`);
+        }
+      }
+      if (layer === 'domain' || layer === 'application') assert.doesNotMatch(source, /\b(?:document|window|navigator)\s*(?:\.|\[)/, `${layer} must not access browser UI`);
+    }
+  }
+});
 
 test('bill mentioning Taobao remains a payment bill', () => {
   assert.equal(classify('淘宝平台商户 支付时间 当前状态 支付成功 交易单号 商户单号'), 'payment');
@@ -58,4 +79,17 @@ test('shuffled images reproduce the template, long invoice separates, all images
   }
   images[0].role = 'taobao';
   assert.throws(() => makeLayout(images), /分别确认/);
+});
+
+test('manual amounts override OCR, compare with the bill, and unknown amounts remain empty', () => {
+  const images = [{ role: 'taobao', taobaoCents: 6380 }, { role: 'payment', paymentCents: 6380 }];
+  assert.deepEqual(getAmountState(images, null), { value: '63.80', invalid: false, source: 'recognized', paymentCents: 6380, differs: false });
+  assert.equal(getAmountState(images, '64.00').differs, true);
+  assert.equal(getAmountState(images, '63.80').source, 'manual');
+  assert.equal(getAmountState(images, '12.345').invalid, true);
+  assert.equal(getAmountState(images, '').invalid, false);
+  delete images[0].taobaoCents;
+  assert.equal(getAmountState(images, null).value, '');
+  assert.equal(getAmountState(images, null).differs, false);
+  assert.equal(getAmountState(images, '63.80').differs, false);
 });
