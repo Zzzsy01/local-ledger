@@ -1,0 +1,8 @@
+node_modules/
+dist/
+public/ocr/
+output/
+.sites-runtime/
+.playwright-cli/
+*.tar.gz
+*.log

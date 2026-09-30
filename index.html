@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1f4b46" />
+    <meta name="description" content="在本机整理发票、淘宝和支付截图，核对实付款并导出 PDF。" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>三图票据整理</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand"><img src="/favicon.svg" alt="" /><h1>三图票据<span>整理</span></h1></div>
+      <div class="header-actions"><span class="local-pill"><i></i>本机处理</span><button id="install" class="quiet">添加到桌面</button></div>
+    </header>
+    <main>
+      <section class="editor" aria-label="图片与金额">
+        <div class="section-heading"><h2>整理一组票据</h2><span class="step">01 / 选图与核对</span></div>
+        <button id="pick" class="dropzone" type="button">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 22V7m-6 6 6-6 6 6M6 22v4h20v-4"/></svg>
+          <strong>选择三张图片</strong>
+          <span>发票 · 淘宝 · 微信 / 支付宝</span>
+          <small>JPG、PNG，顺序不限，也可以拖到这里</small>
+        </button>
+        <input id="files" type="file" accept="image/jpeg,image/png" multiple hidden />
+        <div class="progress-area" hidden><p id="status" role="status" aria-live="polite"></p><progress id="progress" max="1" value="0" aria-label="识别进度"></progress></div>
+        <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+        <div id="images" class="image-list"></div>
+        <div class="amount-section">
+          <label for="amount">淘宝实付款 <span>可修改</span></label>
+          <div class="amount-input"><span>¥</span><input id="amount" type="text" inputmode="decimal" placeholder="识别后显示" autocomplete="off" aria-describedby="amount-note" /></div>
+          <p id="amount-note" class="help">金额只在这里显示，PDF 保留三图样式。</p>
+          <p id="difference" class="notice" hidden></p>
+        </div>
+        <div class="export-section">
+          <label for="filename">PDF 文件名</label>
+          <input id="filename" type="text" value="票据整理" maxlength="80" autocomplete="off" />
+          <button id="export" class="primary" disabled>导出 PDF <span aria-hidden="true">↗</span></button>
+          <p id="export-note" class="help">确认三张图片的类型后即可导出。</p>
+        </div>
+      </section>
+      <section class="preview-section" aria-label="PDF 排版预览">
+        <div class="section-heading"><h2>排版预览</h2><span id="pages" class="step">02 / 导出前确认</span></div>
+        <div id="preview" class="preview-list">
+          <div class="empty-paper"><div class="sample-invoice">发票</div><div class="sample-row"><div>淘宝截图</div><div>支付截图</div></div><p>选择图片后，预览会显示在这里</p></div>
+        </div>
+        <p class="preview-caption">A4 竖版 · 图片保持原比例 · 长图自动分页</p>
+      </section>
+    </main>
+    <footer><p>图片与识别结果仅保留在当前页面，关闭后清除。</p><span id="offline-status" role="status">正在准备离线资源…</span></footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
