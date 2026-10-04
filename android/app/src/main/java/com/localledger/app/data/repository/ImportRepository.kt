@@ -52,7 +52,7 @@ class ImportRepository(private val db: LedgerDatabase, private val ledger: Ledge
                 val key = if (bill.sourceId == null) "csv-file:$digest:${bill.row}" else "csv-id:" + sha("${payAccount.id}:${bill.sourceId}".toByteArray(Charsets.UTF_8))
                 val same = listOf<Any>(bill.amountMinor, bill.type, bill.occurredAt, bill.note.orEmpty())
                 ImportItem(bill, category.id, payAccount.id, key, key in keys, same in matches || !seen.add(same))
-            }, "CSV 账单")
+            }, if ("收/支" in text && ("交易时间" in text || "交易创建时间" in text)) "支付账单 · 仅成功收支；退款、关闭和中性交易已跳过" else "CSV 账单")
         }
     }
     suspend fun confirm(preview: ImportPreview, skipSimilar: Boolean): Int = db.withTransaction {

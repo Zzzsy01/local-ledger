@@ -21,7 +21,7 @@ fun parseCsvBills(text: String, zone: ZoneId = ZoneId.systemDefault()): List<Csv
     var index = 0
     val input = text.removePrefix("\uFEFF")
     fun endField() { row.add(field.toString().trim()); field.setLength(0); closed = false }
-    fun endRow() { endField(); if (row.any { it.isNotBlank() }) rows.add(row); row = mutableListOf(); require(rows.size <= 10_001) { "一次最多导入 10000 笔。" } }
+    fun endRow() { endField(); if (row.any { it.isNotBlank() }) rows.add(row); row = mutableListOf(); require(rows.size <= 10_050) { "一次最多导入 10000 笔。" } }
     while (index < input.length) {
         val c = input[index++]
         if (quoted) {
@@ -39,6 +39,11 @@ fun parseCsvBills(text: String, zone: ZoneId = ZoneId.systemDefault()): List<Csv
     require(!quoted) { "CSV 引号未闭合。" }
     if (field.isNotEmpty() || row.isNotEmpty() || closed) endRow()
     require(rows.size >= 2) { "CSV 没有账目，请使用模板表头。" }
+    val paymentHeader = rows.indexOfFirst { row ->
+        ("交易时间" in row && "收/支" in row && row.any { it == "金额(元)" || it == "金额（元）" }) ||
+            ("交易创建时间" in row && "收/支" in row && "金额（元）" in row)
+    }
+    if (paymentHeader >= 0) return paymentBills(rows.drop(paymentHeader), zone)
     val headers = rows.first()
     require(headers.toSet().size == headers.size) { "CSV 存在重复表头。" }
     listOf("时间", "收支", "金额").forEach { require(it in headers) { "缺少「$it」列，请先转换为导入模板。" } }
@@ -61,4 +66,36 @@ fun parseCsvBills(text: String, zone: ZoneId = ZoneId.systemDefault()): List<Csv
         val ids = bills.mapNotNull { it.sourceId }
         require(ids.toSet().size == ids.size) { "CSV 内来源 ID 重复，请先核对账单。" }
     }
+}
+
+private fun paymentBills(rows: List<List<String>>, zone: ZoneId): List<CsvBill> {
+    val header = rows.first()
+    require(header.distinct().size == header.size) { "支付账单存在重复表头。" }
+    val wechat = "交易时间" in header
+    fun quote(value: String) = "\"" + value.replace("\"", "\"\"") + "\""
+    val normalized = StringBuilder("时间,收支,金额,分类,账户,备注,来源ID\r\n")
+    var count = 0
+    rows.drop(1).forEachIndexed { index, row ->
+        if (row.size == 1 && row.single().startsWith("---")) return@forEachIndexed
+        require(row.size == header.size) { "支付账单第 ${index + 2} 行列数不一致。" }
+        fun value(vararg keys: String): String = keys.firstNotNullOfOrNull { key -> header.indexOf(key).takeIf { it >= 0 }?.let { row[it].trim().removePrefix("'") } }.orEmpty()
+        val direction = value("收/支")
+        val status = value("当前状态", "交易状态")
+        val refunded = value("成功退款（元）", "成功退款(元)")
+        if (refunded.isNotBlank() && refunded != "/") {
+            val refund = requireNotNull(parseAmount(refunded, allowZero = true)) { "退款金额无效，请手动核对支付账单。" }
+            if (refund > 0) return@forEachIndexed
+        }
+        // Neutral transfers, cancelled payments and refunds need manual reconciliation, never guessed as expenditure.
+        if (direction !in listOf("收入", "支出") || status !in listOf("支付成功", "交易成功", "已收钱", "对方已收钱", "转账成功")) return@forEachIndexed
+        val id = value("交易单号", "交易号")
+        require(id.isNotBlank()) { "支付账单缺少交易单号。" }
+        val note = listOf(value("交易对方"), value("商品", "商品名称"), value("备注").takeUnless { it == "/" }.orEmpty()).filter { it.isNotBlank() }.distinct().joinToString(" · ")
+        val amount = value("金额(元)", "金额（元）").removePrefix("¥").removePrefix("￥")
+        val fields = listOf(value("交易时间", "交易创建时间"), direction, amount, "", if (wechat) "微信" else "支付宝", note, (if (wechat) "wechat:" else "alipay:") + id)
+        normalized.append(fields.joinToString(",", transform = ::quote)).append("\r\n")
+        count++
+    }
+    require(count > 0 && count <= 10_000) { "没有可直接导入的成功收支；退款、关闭和中性交易请手动核对。" }
+    return parseCsvBills(normalized.toString(), zone)
 }

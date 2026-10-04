@@ -161,7 +161,7 @@ class LedgerRepositoryTest {
         assertEquals(backup, repository.snapshot())
         repository.restore(LedgerSnapshot(emptyList(), backup.accounts, emptyList()))
         repository.initialize()
-        assertTrue(repository.categories.first().isEmpty())
+        assertTrue(repository.categories.first().none { it.type != com.localledger.app.domain.TRANSFER })
         assertTrue(repository.snapshot().transactions.isEmpty())
     }
 

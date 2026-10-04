@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.localledger.app.domain.EXPENSE
 import com.localledger.app.domain.INCOME
+import com.localledger.app.domain.TRANSFER
 import com.localledger.app.ui.common.Loading
 import java.time.LocalDate
 
@@ -63,7 +65,7 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
     DisposableEffect(Unit) { onDispose { onSavingChanged(false) } }
     LaunchedEffect(draft.saved) { if (draft.saved) { keyboard?.hide(); onSaved() } }
     val categories = state.categories.filter { it.type == draft.type && (!it.isDeleted || it.id == draft.categoryId) }
-    val accounts = state.accounts.filter { !it.isDeleted || it.id == draft.accountId }
+    val accounts = state.accounts.filter { !it.isDeleted || it.id == draft.accountId || it.id == draft.transferAccountId }
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (model.copying) item {
@@ -97,9 +99,10 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = draft.type == EXPENSE, onClick = { model.setType(EXPENSE) }, label = { Text("支出") }, enabled = !draft.loading && !draft.saving)
                     FilterChip(selected = draft.type == INCOME, onClick = { model.setType(INCOME) }, label = { Text("收入") }, enabled = !draft.loading && !draft.saving)
+                    FilterChip(selected = draft.type == TRANSFER, onClick = { model.setType(TRANSFER) }, label = { Text("转账") }, enabled = !draft.loading && !draft.saving)
                 }
             }
-            item {
+            if (draft.type != TRANSFER) item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("分类", style = MaterialTheme.typography.titleSmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -114,11 +117,25 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
             }
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("账户", style = MaterialTheme.typography.titleSmall)
+                    Text(if (draft.type == TRANSFER) "转出账户" else "账户", style = MaterialTheme.typography.titleSmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         accounts.forEach { account ->
                             FilterChip(selected = draft.accountId == account.id,
                                 onClick = { model.setAccount(account.id) }, enabled = !draft.loading && !draft.saving,
+                                label = { Text(account.name + if (account.isDeleted) "（已停用）" else "") })
+                        }
+                    }
+                }
+            }
+            if (draft.type == TRANSFER) item {
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("转入账户", style = MaterialTheme.typography.titleSmall)
+                    Text("账户间转账只改变余额，不计入收入、支出或预算。", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        accounts.filter { it.id != draft.accountId }.forEach { account ->
+                            FilterChip(selected = draft.transferAccountId == account.id,
+                                onClick = { model.setTransferAccount(account.id) }, enabled = !draft.loading && !draft.saving,
                                 label = { Text(account.name + if (account.isDeleted) "（已停用）" else "") })
                         }
                     }
@@ -132,6 +149,26 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
                         DatePickerDialog(context, { _, year, month, day -> model.setDate(LocalDate.of(year, month + 1, day)) },
                             draft.date.year, draft.date.monthValue - 1, draft.date.dayOfMonth).show()
                     }) { Text(draft.date.toString()) }
+                }
+            }
+            item {
+                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(draft.merchant, model::setMerchant, Modifier.weight(1f), label = { Text("商家（选填）") },
+                        enabled = !draft.loading && !draft.saving, singleLine = true)
+                    OutlinedTextField(draft.location, model::setLocation, Modifier.weight(1f), label = { Text("地点（选填）") },
+                        enabled = !draft.loading && !draft.saving, singleLine = true)
+                }
+            }
+            if (draft.type == EXPENSE) item {
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(draft.isReimbursable, model::setReimbursable, enabled = !draft.loading && !draft.saving)
+                        Text("可报销")
+                    }
+                    if (draft.isReimbursable) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(draft.reimbursementStatus == 0, { model.setReimbursementStatus(0) }, label = { Text("未报销") }, enabled = !draft.loading && !draft.saving)
+                        FilterChip(draft.reimbursementStatus == 1, { model.setReimbursementStatus(1) }, label = { Text("已报销") }, enabled = !draft.loading && !draft.saving)
+                    }
                 }
             }
             item {

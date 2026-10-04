@@ -12,7 +12,7 @@ object PlanningReminders {
     fun isEnabled(context: Context): Boolean = context.getSystemService(JobScheduler::class.java).getPendingJob(JOB_ID) != null
     fun configure(context: Context, enabled: Boolean) {
         val scheduler = context.getSystemService(JobScheduler::class.java)
-        if (!enabled) { scheduler.cancel(JOB_ID); context.getSystemService(NotificationManager::class.java).cancel(JOB_ID); return }
+        if (!enabled) { scheduler.cancel(JOB_ID); context.getSystemService(NotificationManager::class.java).cancel(JOB_ID); context.getSystemService(NotificationManager::class.java).cancel(1103); return }
         if (isEnabled(context)) return
         val job = JobInfo.Builder(JOB_ID, ComponentName(context, PlanningReminderJob::class.java))
             .setPeriodic(TimeUnit.DAYS.toMillis(1)).setPersisted(true).build()

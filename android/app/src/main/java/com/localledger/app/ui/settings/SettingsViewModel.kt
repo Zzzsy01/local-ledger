@@ -15,6 +15,8 @@ class SettingsViewModel(private val repository: SettingsRepository, val versionN
     fun appearance(value: String) { repository.appearance(value) }
     fun defaultHome(value: String) { repository.defaultHome(value) }
     fun accent(value: String) { repository.accent(value) }
+    fun capturePayments(value: Boolean) { repository.capturePayments(value) }
+    fun appLock(value: Boolean) { try { repository.appLock(value) } catch (error: Exception) { mutableError.value = error.displayMessage() } }
     fun dueReminders(value: Boolean): Boolean = try {
         repository.dueReminders(value)
         true

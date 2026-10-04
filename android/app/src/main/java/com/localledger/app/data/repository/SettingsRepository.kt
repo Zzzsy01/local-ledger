@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class AppSettings(
     val hideAmounts: Boolean = false, val appearance: String = "system", val dueReminders: Boolean = false,
-    val defaultHome: String = "memos", val accent: String = "blue",
+    val defaultHome: String = "memos", val accent: String = "paper",
+    val appLock: Boolean = false,
+    val capturePayments: Boolean = false,
 )
 
 class SettingsRepository(context: Context) {
@@ -23,9 +25,21 @@ class SettingsRepository(context: Context) {
         appearance = preferences.getString("appearance", "system") ?: "system",
         dueReminders = PlanningReminders.isEnabled(applicationContext),
         defaultHome = preferences.getString("default-home", "memos") ?: "memos",
-        accent = preferences.getString("accent", "blue") ?: "blue",
+        accent = preferences.getString("accent", "paper") ?: "paper",
+        appLock = preferences.getBoolean("app-lock", false),
+        capturePayments = preferences.getBoolean("capture-payments", false),
     ))
     val settings = mutableSettings.asStateFlow()
+    fun capturePayments(enabled: Boolean) {
+        preferences.edit().putBoolean("capture-payments", enabled).apply()
+        mutableSettings.value = mutableSettings.value.copy(capturePayments = enabled)
+    }
+    fun appLock(enabled: Boolean) {
+        require(!enabled || applicationContext.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure) { "请先为手机设置锁屏密码。" }
+        preferences.edit().putBoolean("app-lock", enabled).apply()
+        mutableSettings.value = mutableSettings.value.copy(appLock = enabled)
+        com.localledger.app.data.widget.MemoWidget.refresh(applicationContext)
+    }
 
     fun hideAmounts(hidden: Boolean) {
         preferences.edit().putBoolean("hide-amounts", hidden).apply()
@@ -50,7 +64,7 @@ class SettingsRepository(context: Context) {
     }
 
     fun accent(value: String) {
-        require(value in listOf("blue", "green"))
+        require(value in listOf("blue", "green", "paper"))
         preferences.edit().putString("accent", value).apply()
         mutableSettings.value = mutableSettings.value.copy(accent = value)
     }

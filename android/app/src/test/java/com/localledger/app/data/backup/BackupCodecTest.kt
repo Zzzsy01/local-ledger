@@ -95,7 +95,7 @@ class BackupCodecTest {
     fun damagedOrUnsupportedBackupIsRejected() {
         rejects { BackupCodec.decode("{") }
         rejects { BackupCodec.decode(BackupCodec.encode(snapshot()) + " trailing") }
-        for (version in listOf<Any>(5, "1", true, 1.5)) {
+        for (version in listOf<Any>(6, "1", true, 1.5)) {
             val json = JSONObject(BackupCodec.encode(snapshot())).put("version", version)
             rejects { BackupCodec.decode(json.toString()) }
         }

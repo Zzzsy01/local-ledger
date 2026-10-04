@@ -6,4 +6,5 @@ data class LedgerEntryRow(
     @Embedded val transaction: TransactionEntity,
     val categoryName: String,
     val accountName: String,
+    val transferAccountName: String? = null,
 )

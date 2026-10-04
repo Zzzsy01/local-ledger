@@ -7,6 +7,8 @@ import com.localledger.app.data.repository.LedgerRepository
 import com.localledger.app.domain.Account
 import com.localledger.app.domain.Category
 import com.localledger.app.domain.EXPENSE
+import com.localledger.app.domain.TRANSFER
+import com.localledger.app.domain.TRANSFER_CATEGORY_ID
 import com.localledger.app.domain.formatAmount
 import com.localledger.app.domain.parseAmount
 import com.localledger.app.ui.common.displayMessage
@@ -36,6 +38,11 @@ data class EntryDraft(
     val saving: Boolean = false,
     val saved: Boolean = false,
     val error: String? = null,
+    val transferAccountId: String? = null,
+    val merchant: String = "",
+    val location: String = "",
+    val isReimbursable: Boolean = false,
+    val reimbursementStatus: Int = 0,
 )
 data class EntryState(
     val draft: EntryDraft = EntryDraft(),
@@ -59,6 +66,9 @@ class EntryViewModel(
         note = savedState["note"] ?: "",
         date = savedState.get<String>("date")?.let(LocalDate::parse) ?: LocalDate.now(),
         originalOccurredAt = savedState["originalOccurredAt"],
+        transferAccountId = savedState["transferAccountId"], merchant = savedState["merchant"] ?: "",
+        location = savedState["location"] ?: "", isReimbursable = savedState["isReimbursable"] ?: false,
+        reimbursementStatus = savedState["reimbursementStatus"] ?: 0,
         loading = (id != null || copyFromId != null) && !restored,
     ))
     val state = combine(draft, repository.categories, repository.accounts, ::EntryState)
@@ -74,10 +84,13 @@ class EntryViewModel(
                     require(!entry.isDeleted) { "这笔账目已删除" }
                     val categoryId = if (copying) repository.categories.first().find { it.id == entry.categoryId && !it.isDeleted }?.id else entry.categoryId
                     val accountId = if (copying) repository.accounts.first().find { it.id == entry.accountId && !it.isDeleted }?.id else entry.accountId
+                    val targetId = if (copying) repository.accounts.first().find { it.id == entry.transferAccountId && !it.isDeleted }?.id else entry.transferAccountId
                     change { it.copy(
                         amount = formatAmount(entry.amountMinor), type = entry.type,
                         categoryId = categoryId, accountId = accountId,
                         note = entry.note.orEmpty(),
+                        transferAccountId = targetId, merchant = entry.merchant.orEmpty(), location = entry.location.orEmpty(),
+                        isReimbursable = entry.isReimbursable, reimbursementStatus = if (copying) 0 else entry.reimbursementStatus,
                         date = if (copying) LocalDate.now() else Instant.ofEpochMilli(entry.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate(),
                         originalOccurredAt = if (copying) null else entry.occurredAt, loading = false,
                     ) }
@@ -108,12 +121,24 @@ class EntryViewModel(
         savedState["note"] = value.note
         savedState["date"] = value.date.toString()
         savedState["originalOccurredAt"] = value.originalOccurredAt
+        savedState["transferAccountId"] = value.transferAccountId
+        savedState["merchant"] = value.merchant
+        savedState["location"] = value.location
+        savedState["isReimbursable"] = value.isReimbursable
+        savedState["reimbursementStatus"] = value.reimbursementStatus
     }
 
     fun setAmount(value: String) { change { it.copy(amount = value) } }
-    fun setType(value: Int) { if (value != draft.value.type) change { it.copy(type = value, categoryId = null) } }
+    fun setType(value: Int) { if (value != draft.value.type) change { it.copy(type = value,
+        categoryId = if (value == TRANSFER) TRANSFER_CATEGORY_ID else null, transferAccountId = null,
+        isReimbursable = false, reimbursementStatus = 0) } }
     fun setCategory(value: String) { change { it.copy(categoryId = value) } }
-    fun setAccount(value: String) { change { it.copy(accountId = value) } }
+    fun setAccount(value: String) { change { it.copy(accountId = value, transferAccountId = it.transferAccountId.takeUnless { id -> id == value }) } }
+    fun setTransferAccount(value: String) { change { it.copy(transferAccountId = value) } }
+    fun setMerchant(value: String) { change { it.copy(merchant = value) } }
+    fun setLocation(value: String) { change { it.copy(location = value) } }
+    fun setReimbursable(value: Boolean) { change { it.copy(isReimbursable = value, reimbursementStatus = 0) } }
+    fun setReimbursementStatus(value: Int) { change { it.copy(reimbursementStatus = value) } }
     fun setNote(value: String) { change { it.copy(note = value) } }
     fun setDate(value: LocalDate) { change { it.copy(date = value) } }
 
@@ -125,6 +150,8 @@ class EntryViewModel(
             amount == null || amount <= 0 -> "请输入大于 0 的金额，最多两位小数"
             value.categoryId == null -> "请选择分类"
             value.accountId == null -> "请选择账户"
+            value.type == TRANSFER && value.transferAccountId == null -> "请选择转入账户"
+            value.type == TRANSFER && value.transferAccountId == value.accountId -> "转出和转入账户必须不同"
             else -> null
         }
         if (problem != null) { draft.update { it.copy(error = problem) }; return }
@@ -135,7 +162,10 @@ class EntryViewModel(
                 val previous = value.originalOccurredAt?.let { Instant.ofEpochMilli(it).atZone(zone) }
                 val occurredAt = if (previous?.toLocalDate() == value.date) value.originalOccurredAt!! else
                     value.date.atTime(previous?.toLocalTime() ?: LocalTime.now()).atZone(zone).toInstant().toEpochMilli()
-                repository.saveTransaction(id, amount!!, value.type, value.categoryId!!, value.accountId!!, value.note.trim().ifEmpty { null }, occurredAt)
+                repository.saveTransaction(id, amount!!, value.type, value.categoryId!!, value.accountId!!, value.note.trim().ifEmpty { null }, occurredAt,
+                    transferAccountId = value.transferAccountId, merchant = value.merchant, location = value.location,
+                    isReimbursable = value.isReimbursable, reimbursementStatus = value.reimbursementStatus,
+                    source = savedState["captureSource"] ?: 0, importKey = savedState["captureKey"], captureCandidateId = savedState["captureId"])
                 draft.update { it.copy(saving = false, saved = true) }
             } catch (error: Exception) { draft.update { it.copy(saving = false, error = error.displayMessage()) } }
         }

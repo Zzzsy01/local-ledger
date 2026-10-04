@@ -17,6 +17,13 @@
         android:theme="@style/Theme.LocalLedger">
         <service android:name=".data.update.UpdateCheckJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <service android:name=".data.reminder.PlanningReminderJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+        <service android:name=".data.importing.PaymentNotifications" android:label="随手账支付通知采集" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>
+        <receiver android:name=".data.widget.MemoWidget" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/memo_widget_info" />
+        </receiver>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
         </provider>

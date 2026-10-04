@@ -13,38 +13,45 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface LedgerDao {
+    @Query("SELECT * FROM transactions WHERE isDeleted = 1") fun deletedTransactions(): Flow<List<TransactionEntity>>
     @Query("SELECT * FROM categories ORDER BY type, sortOrder, id")
     fun observeCategories(): Flow<List<CategoryEntity>>
 
     @Query("SELECT * FROM accounts ORDER BY id")
     fun observeAccounts(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM transactions ORDER BY occurredAt DESC, createdAt DESC, id DESC")
+    fun observeTransactions(): Flow<List<TransactionEntity>>
+
     @Query("""
-        SELECT transactions.*, categories.name AS categoryName, accounts.name AS accountName
+        SELECT transactions.*, categories.name AS categoryName, accounts.name AS accountName, target.name AS transferAccountName
         FROM transactions
         JOIN categories ON categories.id = transactions.categoryId
         JOIN accounts ON accounts.id = transactions.accountId
+        LEFT JOIN accounts AS target ON target.id = transactions.transferAccountId
         WHERE transactions.isDeleted = 0 AND occurredAt >= :start AND occurredAt < :end
         ORDER BY occurredAt DESC, createdAt DESC, transactions.id DESC
     """)
     fun observeEntries(start: Long, end: Long): Flow<List<LedgerEntryRow>>
 
     @Query("""
-        SELECT transactions.*, categories.name AS categoryName, accounts.name AS accountName
+        SELECT transactions.*, categories.name AS categoryName, accounts.name AS accountName, target.name AS transferAccountName
         FROM transactions
         JOIN categories ON categories.id = transactions.categoryId
         JOIN accounts ON accounts.id = transactions.accountId
+        LEFT JOIN accounts AS target ON target.id = transactions.transferAccountId
         WHERE transactions.isDeleted = 0 AND occurredAt >= :start AND occurredAt < :end
           AND (:type IS NULL OR transactions.type = :type)
           AND (:categoryId IS NULL OR transactions.categoryId = :categoryId)
-          AND (:accountId IS NULL OR transactions.accountId = :accountId)
+          AND (:accountId IS NULL OR transactions.accountId = :accountId OR transactions.transferAccountId = :accountId)
           AND (:minimum IS NULL OR amountMinor >= :minimum)
           AND (:maximum IS NULL OR amountMinor <= :maximum)
-          AND (:keyword = '' OR instr(lower(COALESCE(note, '') || ' ' || categories.name || ' ' || accounts.name), lower(:keyword)) > 0)
+          AND (:reimbursement IS NULL OR (isReimbursable = 1 AND reimbursementStatus = :reimbursement))
+          AND (:keyword = '' OR instr(lower(COALESCE(note, '') || ' ' || COALESCE(merchant, '') || ' ' || COALESCE(location, '') || ' ' || categories.name || ' ' || accounts.name || ' ' || COALESCE(target.name, '')), lower(:keyword)) > 0)
         ORDER BY occurredAt DESC, createdAt DESC, transactions.id DESC
     """)
     fun observeFilteredEntries(start: Long, end: Long, keyword: String, type: Int?, categoryId: String?,
-        accountId: String?, minimum: Long?, maximum: Long?): Flow<List<LedgerEntryRow>>
+        accountId: String?, minimum: Long?, maximum: Long?, reimbursement: Int?): Flow<List<LedgerEntryRow>>
 
     @Query("""
         SELECT COALESCE(SUM(CASE WHEN type = 1 THEN amountMinor ELSE 0 END), 0) AS income,
@@ -67,6 +74,7 @@ interface LedgerDao {
     @Query("""
         SELECT accounts.id AS accountId, accounts.name AS name, SUM(transactions.amountMinor) AS total
         FROM transactions JOIN accounts ON accounts.id = transactions.accountId
+        LEFT JOIN accounts AS target ON target.id = transactions.transferAccountId
         WHERE transactions.isDeleted = 0 AND occurredAt >= :start AND occurredAt < :end AND transactions.type = :type
         GROUP BY accounts.id, accounts.name ORDER BY total DESC, accounts.id
     """)
@@ -76,7 +84,7 @@ interface LedgerDao {
         SELECT COUNT(*) AS transactionCount,
                COALESCE(SUM(CASE WHEN type = 0 THEN 1 ELSE 0 END), 0) AS expenseCount,
                COALESCE(MAX(CASE WHEN type = 0 THEN amountMinor ELSE 0 END), 0) AS largestExpense
-        FROM transactions WHERE isDeleted = 0 AND occurredAt >= :start AND occurredAt < :end
+        FROM transactions WHERE isDeleted = 0 AND type IN (0, 1) AND occurredAt >= :start AND occurredAt < :end
     """)
     fun observeReportMetrics(start: Long, end: Long): Flow<ReportMetrics>
 
@@ -109,6 +117,9 @@ interface LedgerDao {
 
     @Upsert
     suspend fun saveCategory(category: CategoryEntity)
+
+    @Upsert
+    suspend fun saveAccount(account: AccountEntity)
 
     @Upsert
     suspend fun saveTransaction(transaction: TransactionEntity)

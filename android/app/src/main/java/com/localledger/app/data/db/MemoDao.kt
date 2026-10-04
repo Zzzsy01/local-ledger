@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MemoDao {
+    @Query("SELECT * FROM memos WHERE isDeleted = 1") fun deleted(): Flow<List<MemoEntity>>
     @Query("SELECT * FROM memos WHERE isDeleted = 0 ORDER BY isPinned DESC, isDone, updatedAt DESC, id")
     fun observeMemos(): Flow<List<MemoEntity>>
     @Query("SELECT * FROM memos WHERE id = :id") suspend fun memo(id: String): MemoEntity?

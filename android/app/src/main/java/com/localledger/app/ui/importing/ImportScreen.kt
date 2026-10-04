@@ -21,7 +21,7 @@ fun ImportScreen(model: ImportViewModel) {
     val template = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { it?.let(model::template) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("先预览，再导入", style = MaterialTheme.typography.headlineSmall) }
-        item { Text("使用模板列：时间、收支、金额、分类、账户、备注、来源ID。前三列必填，金额以元填写；分类和账户留空时使用下方选择。微信／支付宝导出文件请先整理为此格式。") }
+        item { Text("使用模板列：时间、收支、金额、分类、账户、备注、来源ID。前三列必填，金额以元填写；分类和账户留空时使用下方选择。也支持微信／支付宝常见 CSV 表头；仅导入成功收支，退款、关闭及中性交易跳过。特殊格式请转为模板。") }
         item { OutlinedButton(onClick = { template.launch("随手账导入模板.csv") }, enabled = !state.busy) { Text("保存 CSV 模板") } }
         item { Choice("文件编码", state.encoding, listOf("UTF-8", "GB18030").map { it to it }, !state.busy) { value -> model.change { it.copy(encoding = value) } } }
         item { Choice("默认支出分类", state.categories.find { it.id == state.expense }?.name.orEmpty(), state.categories.filter { it.type == 0 }.map { it.id to it.name }, !state.busy) { value -> model.change { it.copy(expense = value) } } }
@@ -32,7 +32,7 @@ fun ImportScreen(model: ImportViewModel) {
         state.message?.let { item { Text(it, color = MaterialTheme.colorScheme.primary) } }
         state.preview?.let { preview ->
             val importable = preview.items.filter { !it.alreadyImported && (!state.skipSimilar || !it.similar) }
-            item { HorizontalDivider(); Text("${preview.items.size} 笔 · 已导入 ${preview.items.count { it.alreadyImported }} 笔 · 待导入 ${importable.size} 笔", style = MaterialTheme.typography.titleMedium) }
+            item { Text(preview.filename); HorizontalDivider(); Text("${preview.items.size} 笔 · 已导入 ${preview.items.count { it.alreadyImported }} 笔 · 待导入 ${importable.size} 笔", style = MaterialTheme.typography.titleMedium) }
             item { Row { Checkbox(state.skipSimilar, model::skipSimilar, enabled = !state.busy); Column(Modifier.weight(1f)) { Text("跳过疑似重复账目"); Text("金额、收支、时间与备注相同视为疑似重复；来源 ID 或同文件同一行用于确定已导入。", style = MaterialTheme.typography.bodySmall) } } }
             item { Button(onClick = model::confirm, enabled = !state.busy && importable.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("确认导入 ${importable.size} 笔") } }
             items(preview.items, key = { it.bill.row }) { item ->

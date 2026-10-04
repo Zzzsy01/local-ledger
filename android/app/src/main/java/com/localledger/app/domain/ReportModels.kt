@@ -19,6 +19,7 @@ data class LedgerFilter(
     val accountId: String? = null,
     val minimum: Long? = null,
     val maximum: Long? = null,
+    val reimbursement: Int? = null,
 )
 
 data class AccountTotal(val accountId: String, val name: String, val total: Long)

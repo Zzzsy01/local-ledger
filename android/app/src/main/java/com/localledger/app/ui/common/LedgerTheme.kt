@@ -55,7 +55,8 @@ fun LedgerTheme(darkTheme: Boolean = isSystemInDarkTheme(), accent: String = "bl
         onSurface = Color(0xFF1A2D28), onSurfaceVariant = Color(0xFF63766E),
         outlineVariant = Color(0xFFDCE5E0),
     )
-    val colors = if (accent == "green") scheme else if (darkTheme) scheme.copy(
+    val colors = if (accent == "paper") { if (darkTheme) scheme else scheme.copy(background = Color(0xFFF7F8F2), surfaceContainerHigh = Color(0xFFF0F2E9), outlineVariant = Color(0xFFE4E7DB)) }
+    else if (accent == "green") scheme else if (darkTheme) scheme.copy(
         primary = Color(0xFFAEBEFF), onPrimary = Color(0xFF142967),
         primaryContainer = Color(0xFF263653), onPrimaryContainer = Color(0xFFDEE5FF),
         secondary = Color(0xFFADCBEF), secondaryContainer = Color(0xFF263C58),

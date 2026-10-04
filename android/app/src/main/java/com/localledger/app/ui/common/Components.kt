@@ -29,7 +29,7 @@ internal fun MonthPicker(month: YearMonth, onChange: (Long) -> Unit) {
 }
 
 @Composable
-internal fun amountColor(type: Int): Color = if (type == INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+internal fun amountColor(type: Int): Color = when(type) { INCOME -> Color(0xFF398365); com.localledger.app.domain.TRANSFER -> Color(0xFF547EA8); else -> Color(0xFFB66C60) }
 
 @Composable
 internal fun Loading() {

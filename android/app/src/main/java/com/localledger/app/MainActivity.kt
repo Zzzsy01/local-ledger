@@ -56,11 +56,37 @@ import com.localledger.app.ui.common.LedgerTheme
 import com.localledger.app.ui.LedgerApp
 import com.localledger.app.ui.backup.LedgerHostViewModel
 import java.time.LocalDate
+import android.app.KeyguardManager
+import android.view.WindowManager
+import com.localledger.app.data.widget.MemoWidget
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 
 class MainActivity : ComponentActivity() {
     private companion object {
         const val ACTION_ENTRY = "com.localledger.app.action.ENTRY"
         const val ACTION_MEMO = "com.localledger.app.action.MEMO"
+    }
+    private var unlocked by mutableStateOf(false)
+    private var authenticating = false
+    private val unlockResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        authenticating = false
+        unlocked = it.resultCode == RESULT_OK
+    }
+    private fun unlock() {
+        val intent = getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent("解锁随手账", "使用手机锁屏密码验证身份")
+        if (intent != null) { authenticating = true; unlockResult.launch(intent) }
+    }
+    override fun onResume() {
+        super.onResume()
+        val settings = (application as LedgerApplication).settingsRepository
+        if (settings.settings.value.appLock && !getSystemService(KeyguardManager::class.java).isDeviceSecure) {
+            settings.appLock(false)
+            Toast.makeText(this, "手机锁屏密码已移除，应用锁已关闭。", Toast.LENGTH_LONG).show()
+        }
+    }
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations && !authenticating) unlocked = false
     }
     private var requestedRoute by mutableStateOf<String?>(null)
     private val updates by viewModels<UpdateViewModel> {
@@ -82,6 +108,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         if (intent.action == UpdateCheckJob.ACTION_UPDATES) { updates.open(); updates.check() }
         if (intent.action == PlanningReminderJob.ACTION_PLANNING) requestedRoute = "planning"
+        if (intent.action == PlanningReminderJob.ACTION_LIFE) requestedRoute = "life"
         shortcutRoute(intent)?.let { requestedRoute = it }
     }
 
@@ -89,6 +116,8 @@ class MainActivity : ComponentActivity() {
         val route = when (intent.action) {
             ACTION_ENTRY -> "add"
             ACTION_MEMO -> "memo/add"
+            MemoWidget.ACTION_TASK -> "memo/task"
+            MemoWidget.ACTION_TASKS -> "tasks"
             else -> null
         }
         if (route != null) {
@@ -111,6 +140,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun pinShortcut(kind: String) {
+        if (kind == "widget") {
+            val manager = getSystemService(android.appwidget.AppWidgetManager::class.java)
+            if (manager.isRequestPinAppWidgetSupported) manager.requestPinAppWidget(android.content.ComponentName(this, MemoWidget::class.java), null, null)
+            else Toast.makeText(this, "请长按桌面，在小组件中添加「随手账」。", Toast.LENGTH_LONG).show()
+            return
+        }
         val manager = getSystemService(ShortcutManager::class.java)
         if (!manager.isRequestPinShortcutSupported) {
             Toast.makeText(this, "当前桌面不支持添加快捷图标，可长按应用图标使用快捷入口。", Toast.LENGTH_LONG).show()
@@ -162,6 +197,7 @@ class MainActivity : ComponentActivity() {
         }
         if (intent.action == PlanningReminderJob.ACTION_PLANNING) requestedRoute = "planning"
         shortcutRoute(intent)?.let { requestedRoute = it }
+        if (intent.action == PlanningReminderJob.ACTION_LIFE) requestedRoute = "life"
         lifecycleScope.launch(Dispatchers.IO) {
             getSystemService(ShortcutManager::class.java).dynamicShortcuts = listOf(recordShortcut("entry"), recordShortcut("memo"))
         }
@@ -169,6 +205,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by host.state.collectAsStateWithLifecycle()
             val settings by app.settingsRepository.settings.collectAsStateWithLifecycle()
+            val workspaceStates = rememberSaveableStateHolder()
+            LaunchedEffect(settings.appLock) {
+                if (settings.appLock) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
+            LaunchedEffect(state.restoreGeneration) { MemoWidget.refresh(this@MainActivity) }
             val darkTheme = when(settings.appearance) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
             LaunchedEffect(darkTheme) {
                 val style = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { darkTheme }
@@ -176,7 +218,14 @@ class MainActivity : ComponentActivity() {
             }
             LedgerTheme(darkTheme = darkTheme, accent = settings.accent) {
                 Surface(Modifier.fillMaxSize()) {
+                    if (settings.appLock && !unlocked) {
+                        Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("随手账已锁定", style = MaterialTheme.typography.headlineSmall)
+                            Button(onClick = ::unlock, modifier = Modifier.padding(top = 20.dp)) { Text("解锁") }
+                        }
+                    } else {
                     if (state.ready) {
+                        workspaceStates.SaveableStateProvider("workspace") {
                         key(state.restoreGeneration) {
                             LedgerApp(
                                 repository = repository,
@@ -184,10 +233,14 @@ class MainActivity : ComponentActivity() {
                                 memoRepository = app.memoRepository,
                                 wishRepository = app.wishRepository,
                                 planningRepository = app.planningRepository,
+                                lifeRepository = app.lifeRepository,
+                                recycleRepository = app.recycleRepository,
+                                captureRepository = app.captureRepository,
                                 settingsRepository = app.settingsRepository,
                                 importRepository = app.importRepository,
                                 versionName = app.updateRepository.versionName,
                                 onNotifications = ::requestNotifications,
+                                onCaptureAccess = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
                                 onShortcut = ::pinShortcut,
                                 requestedRoute = requestedRoute,
                                 onRouteHandled = { requestedRoute = null },
@@ -195,6 +248,7 @@ class MainActivity : ComponentActivity() {
                                 onExport = { exportFile.launch("随手账备份-${LocalDate.now()}.json") },
                                 onImport = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
                             )
+                        }
                         }
                     } else {
                         Column(
@@ -219,7 +273,7 @@ class MainActivity : ComponentActivity() {
                         if (!state.busy) AlertDialog(
                             onDismissRequest = host::cancelRestore,
                             title = { Text("恢复完整备份？") },
-                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.wishes.count { !it.isDeleted }} 个心愿、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目。恢复会替换当前全部数据；旧备份未包含的心愿及其他内容也会清空，建议先导出完整备份。") },
+                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.wishes.count { !it.isDeleted }} 个心愿、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目、${snapshot.lifeItems.count { !it.isDeleted }} 条生活记录、${snapshot.focusSessions.count { !it.isDeleted }} 次专注及 ${snapshot.studyCards.count { !it.isDeleted }} 张单词卡。恢复会替换当前全部数据；旧备份未包含的心愿及其他内容也会清空，建议先导出完整备份。") },
                             confirmButton = { TextButton(onClick = host::confirmRestore) { Text("替换并恢复") } },
                             dismissButton = { TextButton(onClick = host::cancelRestore) { Text("取消") } },
                         )
@@ -231,6 +285,7 @@ class MainActivity : ComponentActivity() {
                             text = { Text(message) },
                             confirmButton = { TextButton(onClick = host::dismissMessage) { Text("知道了") } },
                         )
+                    }
                     }
                 }
             }

@@ -13,8 +13,8 @@ android {
         applicationId = "com.localledger.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.4.1"
+        versionCode = 10
+        versionName = "1.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -47,6 +47,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.room:room-runtime:2.8.5")
     implementation("androidx.room:room-ktx:2.8.5")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     ksp("androidx.room:room-compiler:2.8.5")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")

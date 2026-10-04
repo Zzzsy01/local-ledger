@@ -12,6 +12,34 @@ import org.junit.runner.RunWith
 class LedgerMigrationTest {
     @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), LedgerDatabase::class.java)
 
+    @Test fun migrationFromFourPreservesOldColumnsAndAddsLifeAndTransferFields() {
+        val name = "migration-life-test.db"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        try {
+            helper.createDatabase(name, 4).apply {
+                execSQL("INSERT INTO accounts VALUES ('00000000-0000-4000-8000-000000000001','cash',0)")
+                execSQL("INSERT INTO categories VALUES ('10000000-0000-4000-8000-000000000001','food',0,NULL,0,1)")
+                execSQL("INSERT INTO transactions VALUES ('20000000-0000-4000-8000-000000000001',12345,0,'10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','keep',10,10,20,1,8,'csv-kept')")
+                execSQL("INSERT INTO assets VALUES ('30000000-0000-4000-8000-000000000001','camera','摄影',30000,15000,10,'10000,20000','keep',10,20,0)")
+                execSQL("INSERT INTO memos VALUES ('40000000-0000-4000-8000-000000000001','memo','keep',1,1,10,20,0)")
+                execSQL("INSERT INTO wishes VALUES ('50000000-0000-4000-8000-000000000001','camera',30000,15000,'keep',0,10,20,0)")
+                close()
+            }
+            helper.runMigrationsAndValidate(name, 5, true).apply {
+                query("SELECT amountMinor,note,isDeleted,source,importKey,transferAccountId,isReimbursable FROM transactions").use {
+                    assertTrue(it.moveToFirst());assertEquals(12345,it.getInt(0));assertEquals("keep",it.getString(1));assertEquals(1,it.getInt(2));assertEquals(8,it.getInt(3));assertEquals("csv-kept",it.getString(4));assertTrue(it.isNull(5));assertEquals(0,it.getInt(6))
+                }
+                query("SELECT name,valueMinor,quantity,status,photoPaths FROM assets").use { assertTrue(it.moveToFirst());assertEquals("camera",it.getString(0));assertEquals(15000,it.getInt(1));assertEquals(1,it.getInt(2));assertEquals("持有中",it.getString(3));assertEquals("[]",it.getString(4)) }
+                query("SELECT content,isDone,kind,color,folder FROM memos").use { assertTrue(it.moveToFirst());assertEquals("keep",it.getString(0));assertEquals(1,it.getInt(1));assertEquals("note",it.getString(2));assertEquals("yellow",it.getString(3));assertEquals("默认",it.getString(4)) }
+                query("SELECT savedMinor FROM wishes").use { assertTrue(it.moveToFirst());assertEquals(15000,it.getInt(0)) }
+                query("SELECT type FROM categories WHERE id='00000000-0000-0000-0000-000000000002'").use { assertTrue(it.moveToFirst());assertEquals(2,it.getInt(0)) }
+                for (table in listOf("life_items","life_check_ins","focus_sessions","study_cards","payment_candidates")) query("SELECT COUNT(*) FROM $table").use { assertTrue(it.moveToFirst());assertEquals(0,it.getInt(0)) }
+                query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+                close()
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
     @Test fun migrationFromThreePreservesSevenTablesAndAddsEmptyWishlist() {
         val name = "migration-wishes-test.db"
         val context = InstrumentationRegistry.getInstrumentation().targetContext

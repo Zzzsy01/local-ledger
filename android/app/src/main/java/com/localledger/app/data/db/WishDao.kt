@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WishDao {
+    @Query("SELECT * FROM wishes WHERE isDeleted = 1") fun deleted(): Flow<List<WishEntity>>
     @Query("SELECT * FROM wishes WHERE isDeleted = 0 ORDER BY isPurchased, updatedAt DESC, id")
     fun observeWishes(): Flow<List<WishEntity>>
     @Query("SELECT * FROM wishes WHERE id = :id") suspend fun wish(id: String): WishEntity?

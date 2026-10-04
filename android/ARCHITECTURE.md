@@ -60,7 +60,7 @@ flowchart LR
     Backup --> Domain
 ```
 
-数据库当前为版本 4，共八张表，使用 1→2→3→4 自动迁移旧数据。JSON 格式版本 4 备份全部业务表，兼容读取版本 1、2、3。物品均价使用整数运算，所有有效物品总估值限制为 Long 范围；规则在保存事务及恢复前统一校验。
+数据库当前为版本 5，共十三张表，使用 1→2→3→4→5 自动迁移旧数据；4→5 同时加入固定转账分类。JSON 格式版本 5 备份全部业务表与物品照片字节，兼容读取版本 1–4。物品均价使用整数运算，所有有效物品总估值限制为 Long 范围；规则在保存事务及恢复前统一校验。
 
 心愿独立记录预计价格与用户填写的已攒金额，不修改账目或支付账户。每个心愿先将有效攒钱限制在其目标以内，再汇总待买预算和剩余目标；买到／软删除项不计入待买预算。保存与恢复均检查整数总额，避免溢出。达成和编辑保留 UUID、创建时间与历史状态。
 
@@ -77,3 +77,11 @@ flowchart LR
 当前没有复杂的跨 Repository 编排，因此不增加空转的 UseCase、BaseRepository 或 DI 框架。只有出现多页面复用的复杂业务操作，再提取 UseCase；出现实际构建隔离需求，再拆 Gradle 模块。
 
 参考 [Android 官方分层建议](https://developer.android.com/topic/architecture/recommendations) 和 [Ivy Wallet 架构说明](https://github.com/Ivy-Apps/ivy-wallet/blob/main/docs/guidelines/Architecture.md)：数据统一由 Repository 提供，ViewModel 转成界面状态，领域用例按业务复杂度引入。
+
+## 1.5.0 扩展
+
+`LifeModels.kt → LifeRepository → LifeDao` 管理生活记录、习惯打卡、专注、单词卡四表；日期采用日历日，专注采用已累计毫秒和持久化开始时刻。`PaymentText.kt` 提供保守的金额提示，`CaptureRepository` 负责打包模型识别和支付候选保存；通知服务只处理白名单来源，最终确认仍经过 `LedgerRepository`。候选处理与账目保存同一事务。
+
+`MemoWidget` 使用系统 RemoteViews，回收站经 Repository 恢复软删除记录。应用锁由 Activity 请求系统锁屏凭据，应用页面的保存状态置于锁定门外；锁定时隐藏组件与通知正文。账户余额使用 BigInteger 累计后检查每账户 Long 范围，转账不影响收支统计。
+
+照片路径限定应用私有目录；导出先限制总字节数，恢复校验后生成新的附件路径，失败删除本次准备的文件，数据库原数据保持不变。具体数据口径及边界见 [PDF-INTEGRATION.md](PDF-INTEGRATION.md)。
