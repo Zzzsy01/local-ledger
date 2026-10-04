@@ -1,0 +1,299 @@
+package com.localledger.app.ui
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.localledger.app.data.repository.AssetRepository
+import com.localledger.app.ui.assets.*
+import com.localledger.app.ui.common.LocalHideAmounts
+import com.localledger.app.data.repository.MemoRepository
+import com.localledger.app.data.repository.PlanningRepository
+import com.localledger.app.data.repository.SettingsRepository
+import com.localledger.app.data.repository.ImportRepository
+import com.localledger.app.ui.memo.*
+import com.localledger.app.ui.planning.*
+import com.localledger.app.ui.settings.*
+import com.localledger.app.ui.importing.*
+import com.localledger.app.data.repository.LedgerRepository
+import com.localledger.app.ui.add.EntryScreen
+import com.localledger.app.ui.add.EntryViewModel
+import com.localledger.app.ui.category.CategoryScreen
+import com.localledger.app.ui.category.CategoryViewModel
+import com.localledger.app.ui.home.HomeScreen
+import com.localledger.app.ui.home.HomeViewModel
+import com.localledger.app.ui.stats.StatsScreen
+import com.localledger.app.ui.stats.StatsViewModel
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LedgerApp(
+    repository: LedgerRepository,
+    assetRepository: AssetRepository,
+    memoRepository: MemoRepository,
+    planningRepository: PlanningRepository,
+    settingsRepository: SettingsRepository,
+    importRepository: ImportRepository,
+    versionName: String,
+    onNotifications: () -> Unit,
+    onShortcut: (String) -> Unit,
+    requestedRoute: String? = null,
+    onRouteHandled: () -> Unit = {},
+    onUpdate: () -> Unit = {},
+    onExport: () -> Unit = {},
+    onImport: () -> Unit = {},
+) {
+    val settings by settingsRepository.settings.collectAsStateWithLifecycle()
+    CompositionLocalProvider(LocalHideAmounts provides settings.hideAmounts) {
+        val navigation = rememberNavController()
+        val startRoute = rememberSaveable { settings.defaultHome }
+        var homeRoute by rememberSaveable { mutableStateOf(startRoute) }
+        fun openMain(destination: String) {
+            if (destination in listOf("home", "memos")) homeRoute = destination
+            navigation.navigate(destination) {
+                popUpTo(navigation.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+        LaunchedEffect(requestedRoute) { requestedRoute?.let { navigation.navigate(it) { launchSingleTop = true }; onRouteHandled() } }
+        val backStack by navigation.currentBackStackEntryAsState()
+        val route = backStack?.destination?.route ?: startRoute
+        LaunchedEffect(route) { if (route in listOf("home", "memos")) homeRoute = route }
+        val editing = route == "add" || route == "edit/{id}" || route == "copy/{id}" || route.startsWith("asset/") || route.startsWith("memo/")
+        val mainRoute = route in listOf("home", "memos", "assets", "stats", "settings")
+        val snackbar = remember { SnackbarHostState() }
+        val scope = rememberCoroutineScope()
+        var menuOpen by remember { mutableStateOf(false) }
+        var entrySaving by remember { mutableStateOf(false) }
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        if (route in listOf("home", "memos")) SingleChoiceSegmentedButtonRow(Modifier.width(224.dp)) {
+                            listOf("home" to "记账", "memos" to "备忘录").forEachIndexed { index, (destination, label) ->
+                                SegmentedButton(selected = route == destination, onClick = { openMain(destination) },
+                                    shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {}) { Text(label, maxLines = 1) }
+                            }
+                        } else Text(when (route) {
+                        "assets" -> "身家"
+                        "asset/add" -> "添置物品"
+                        "asset/edit/{id}" -> "更新物品估值"
+                        "stats" -> "报表分析"
+                        "settings" -> "设置"
+                        "planning" -> "预算与固定账目"
+                        "import" -> "导入账单"
+                        "memos" -> "备忘录"
+                        "memo/add" -> "新建备忘录"
+                        "memo/edit/{id}" -> "编辑备忘录"
+                        "category" -> "分类管理"
+                        "add" -> "记一笔"
+                        "edit/{id}" -> "编辑账目"
+                        "copy/{id}" -> "再记一笔"
+                        else -> "随手账"
+                    }) },
+                    navigationIcon = {
+                        if (!mainRoute) IconButton(enabled = !entrySaving, onClick = { navigation.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    },
+                    actions = {
+                        if (!editing) {
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "备份与恢复") }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(text = { Text("设置") }, onClick = { menuOpen = false; openMain("settings") })
+                                DropdownMenuItem(text = { Text(if (homeRoute == "memos") "记账主页" else "备忘录主页") }, onClick = { menuOpen = false; openMain(if (homeRoute == "memos") "home" else "memos") })
+                                DropdownMenuItem(text = { Text("预算与固定账目") }, onClick = { menuOpen = false; navigation.navigate("planning") })
+                                DropdownMenuItem(text = { Text("应用更新") }, onClick = { menuOpen = false; onUpdate() })
+                                DropdownMenuItem(text = { Text("导出完整备份") }, onClick = { menuOpen = false; onExport() })
+                                DropdownMenuItem(text = { Text("恢复完整备份") }, onClick = { menuOpen = false; onImport() })
+                            }
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                if (mainRoute) NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    listOf(homeRoute to "主页", "assets" to "身家", "stats" to "报表", "settings" to "设置").forEach { (destination, label) ->
+                        NavigationBarItem(
+                            selected = route == destination,
+                            onClick = { openMain(destination) },
+                            icon = { Icon(when (destination) {
+                                "home" -> Icons.Default.Home
+                                "memos" -> Icons.AutoMirrored.Filled.List
+                                "assets" -> Icons.Default.AccountBox
+                                "stats" -> Icons.Default.DateRange
+                                else -> Icons.Default.Settings
+                            }, contentDescription = null) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            },
+            floatingActionButton = {
+                if (route in listOf("home", "assets", "memos")) ExtendedFloatingActionButton(
+                    modifier = Modifier.semantics { contentDescription = when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" } },
+                    onClick = { navigation.navigate(when(route) { "assets" -> "asset/add"; "memos" -> "memo/add"; else -> "add" }) },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text(when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" }) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbar) },
+        ) { padding ->
+            NavHost(navigation, startDestination = startRoute, modifier = Modifier.padding(padding)) {
+                composable("home") {
+                    val model: HomeViewModel = viewModel(factory = remember(repository) {
+                        viewModelFactory { initializer { HomeViewModel(repository) } }
+                    })
+                    HomeScreen(model, snackbar, onEdit = { navigation.navigate("edit/$it") }, onCopy = { navigation.navigate("copy/$it") })
+                }
+                composable("assets") {
+                    val model: AssetsViewModel = viewModel(factory = remember(assetRepository) {
+                        viewModelFactory { initializer { AssetsViewModel(assetRepository) } }
+                    })
+                    AssetsScreen(model) { navigation.navigate("asset/edit/$it") }
+                }
+                composable("asset/add") {
+                    val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository) {
+                        viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), null) } }
+                    })
+                    AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                }
+                composable("asset/edit/{id}") { entry ->
+                    val id = requireNotNull(entry.arguments?.getString("id"))
+                    val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository, id) {
+                        viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), id) } }
+                    })
+                    AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                }
+                composable("stats") {
+                    val model: StatsViewModel = viewModel(factory = remember(repository) {
+                        viewModelFactory { initializer { StatsViewModel(repository, createSavedStateHandle()) } }
+                    })
+                    StatsScreen(model, onEdit = { navigation.navigate("edit/$it") })
+                }
+                composable("category") {
+                    val model: CategoryViewModel = viewModel(factory = remember(repository) {
+                        viewModelFactory { initializer { CategoryViewModel(repository) } }
+                    })
+                    CategoryScreen(model, snackbar)
+                }
+                composable("settings") {
+                    val model: SettingsViewModel = viewModel(factory = remember(settingsRepository) {
+                        viewModelFactory { initializer { SettingsViewModel(settingsRepository, versionName) } }
+                    })
+                    SettingsScreen(model, onCategories = { navigation.navigate("category") }, onPlans = { navigation.navigate("planning") },
+                        onExport = onExport, onRestore = onImport, onImportCsv = { navigation.navigate("import") },
+                        onUpdate = onUpdate, onMemos = { openMain("memos") }, onNotifications = onNotifications, onShortcut = onShortcut)
+                }
+                composable("planning") {
+                    val model: PlanningViewModel = viewModel(factory = remember(planningRepository, repository) {
+                        viewModelFactory { initializer { PlanningViewModel(planningRepository, repository, createSavedStateHandle()) } }
+                    })
+                    PlanningScreen(model)
+                }
+                composable("import") {
+                    val model: ImportViewModel = viewModel(factory = remember(importRepository, repository) {
+                        viewModelFactory { initializer { ImportViewModel(importRepository, repository) } }
+                    })
+                    ImportScreen(model)
+                }
+                composable("memos") {
+                    val model: MemosViewModel = viewModel(factory = remember(memoRepository) {
+                        viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle()) } }
+                    })
+                    MemosScreen(model, onAdd = { navigation.navigate("memo/add") }, onEdit = { navigation.navigate("memo/edit/$it") })
+                }
+                composable("memo/add") {
+                    val model: MemoEditorViewModel = viewModel(factory = remember(memoRepository) {
+                        viewModelFactory { initializer { MemoEditorViewModel(memoRepository, createSavedStateHandle(), null) } }
+                    })
+                    MemoEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                }
+                composable("memo/edit/{id}") { entry ->
+                    val id = requireNotNull(entry.arguments?.getString("id"))
+                    val model: MemoEditorViewModel = viewModel(factory = remember(memoRepository, id) {
+                        viewModelFactory { initializer { MemoEditorViewModel(memoRepository, createSavedStateHandle(), id) } }
+                    })
+                    MemoEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                }
+                composable("add") {
+                    val model: EntryViewModel = viewModel(factory = remember(repository) {
+                        viewModelFactory { initializer { EntryViewModel(repository, createSavedStateHandle(), null) } }
+                    })
+                    EntryScreen(model, onSavingChanged = { entrySaving = it }) {
+                        navigation.popBackStack()
+                        scope.launch { snackbar.showSnackbar("账目已保存") }
+                    }
+                }
+                composable("edit/{id}") { entry ->
+                    val id = requireNotNull(entry.arguments?.getString("id"))
+                    val model: EntryViewModel = viewModel(factory = remember(repository, id) {
+                        viewModelFactory { initializer { EntryViewModel(repository, createSavedStateHandle(), id) } }
+                    })
+                    EntryScreen(model, onSavingChanged = { entrySaving = it }) {
+                        navigation.popBackStack()
+                        scope.launch { snackbar.showSnackbar("账目已更新") }
+                    }
+                }
+                composable("copy/{id}") { entry ->
+                    val id = requireNotNull(entry.arguments?.getString("id"))
+                    val model: EntryViewModel = viewModel(factory = remember(repository, id) {
+                        viewModelFactory { initializer { EntryViewModel(repository, createSavedStateHandle(), null, copyFromId = id) } }
+                    })
+                    EntryScreen(model, onSavingChanged = { entrySaving = it }) { navigation.popBackStack(); scope.launch { snackbar.showSnackbar("新账目已保存") } }
+                }
+            }
+        }
+    }
+}

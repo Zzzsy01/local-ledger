@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.LocalLedger" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#245C4B</item>
+    </style>
+</resources>
