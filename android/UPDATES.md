@@ -1,6 +1,6 @@
 # 应用更新发布
 
-源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.3.3（versionCode 7），1.3.1 起预置更新地址：
+源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.4.0（versionCode 8），1.3.1 起预置更新地址：
 
 ```text
 https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
@@ -8,9 +8,9 @@ https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
 
 ## 手机使用
 
-1. 在「设置 → 应用更新」开启「自动检查并通知」，点「保存更新设置」，允许通知。也可随时点「检查更新」。
+1. 1.4.0 首次打开会启用「自动检查并通知」，Android 13 及以上请允许通知。可在「设置 → 应用自动更新」调整开关、保存更新设置，或随时点「检查更新」。此后保留手动关闭的选择。
 2. 发现新版本后查看说明、下载；客户端校验完成后点「安装更新」，按系统提示确认。首次安装可能需要允许随手账安装应用。
-3. 已安装 1.3.0 或更早版本的手机，可以填写上述地址并保存，也可以从 [最新版本](https://github.com/Zzzsy01/local-ledger/releases/latest) 下载 APK 手动覆盖安装一次。后续沿用已保存的更新设置。
+3. 已安装 1.3.0 或更早版本的手机，可以填写上述地址并保存，也可以从 [最新版本](https://github.com/Zzzsy01/local-ledger/releases/latest) 下载 APK 手动覆盖安装一次。旧版未开启自动检查时，首次进入 1.4.0 也会启用一次；后续沿用已保存的更新设置。
 
 自动检查通过 Android JobScheduler 每日执行，并在应用打开时补查。系统省电策略可能推迟检查；不能静默安装。Android 13 及以上需要通知权限。关闭通知仍可手动检查。
 

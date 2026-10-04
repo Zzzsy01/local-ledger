@@ -8,6 +8,7 @@ import com.localledger.app.domain.Transaction
 import com.localledger.app.domain.Memo
 import com.localledger.app.domain.Budget
 import com.localledger.app.domain.RecurringRule
+import com.localledger.app.domain.Wish
 import com.localledger.app.domain.validateSnapshot
 import org.json.JSONArray
 import org.json.JSONException
@@ -18,7 +19,7 @@ object BackupCodec {
     fun encode(snapshot: LedgerSnapshot): String {
         validateSnapshot(snapshot)
         return JSONObject()
-            .put("version", 3)
+            .put("version", 4)
             .put("categories", JSONArray(snapshot.categories.map {
                 JSONObject().put("id", it.id).put("name", it.name).put("type", it.type)
                     .put("icon", it.icon ?: JSONObject.NULL).put("sortOrder", it.sortOrder)
@@ -54,6 +55,11 @@ object BackupCodec {
                     .put("type", it.type).put("categoryId", it.categoryId).put("accountId", it.accountId)
                     .put("nextDueAt", it.nextDueAt).put("dayOfMonth", it.dayOfMonth).put("note", it.note ?: JSONObject.NULL)
                     .put("createdAt", it.createdAt).put("updatedAt", it.updatedAt).put("isDeleted", it.isDeleted)
+            }))
+            .put("wishes", JSONArray(snapshot.wishes.map {
+                JSONObject().put("id", it.id).put("name", it.name).put("targetMinor", it.targetMinor)
+                    .put("savedMinor", it.savedMinor).put("note", it.note ?: JSONObject.NULL).put("isPurchased", it.isPurchased)
+                    .put("createdAt", it.createdAt).put("updatedAt", it.updatedAt).put("isDeleted", it.isDeleted)
             })).toString()
     }
 
@@ -63,7 +69,7 @@ object BackupCodec {
             val json = input.nextValue()
             require(json is JSONObject && input.nextClean() == '\u0000') { "备份必须是一个完整的 JSON 对象。" }
             val version = json.integer("version")
-            require(version in 1..3) { "不支持此备份版本。" }
+            require(version in 1..4) { "不支持此备份版本。" }
             return LedgerSnapshot(
                 categories = json.objects("categories").map {
                     Category(it.string("id"), it.string("name"), it.integer("type"),
@@ -106,6 +112,10 @@ object BackupCodec {
                     RecurringRule(it.string("id"), it.string("name"), it.wholeLong("amountMinor"), it.integer("type"),
                         it.string("categoryId"), it.string("accountId"), it.wholeLong("nextDueAt"), it.integer("dayOfMonth"),
                         it.nullableString("note"), it.wholeLong("createdAt"), it.wholeLong("updatedAt"), it.boolean("isDeleted"))
+                },
+                wishes = if (version < 4) emptyList() else json.objects("wishes").map {
+                    Wish(it.string("id"), it.string("name"), it.wholeLong("targetMinor"), it.wholeLong("savedMinor"),
+                        it.nullableString("note"), it.boolean("isPurchased"), it.wholeLong("createdAt"), it.wholeLong("updatedAt"), it.boolean("isDeleted"))
                 },
             ).also(::validateSnapshot)
         } catch (error: JSONException) {

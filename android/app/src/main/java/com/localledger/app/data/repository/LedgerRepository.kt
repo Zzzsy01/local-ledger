@@ -159,12 +159,14 @@ class LedgerRepository(
             db.memoDao().allMemos().map { it.toDomain() },
             db.planningDao().allBudgets().map { it.toDomain() },
             db.planningDao().allRules().map { it.toDomain() },
+            db.wishDao().allWishes().map { it.toDomain() },
         )
     }
 
     suspend fun restore(snapshot: LedgerSnapshot) {
         validateSnapshot(snapshot)
         db.withTransaction {
+            db.wishDao().clear()
             db.planningDao().clearRules()
             db.planningDao().clearBudgets()
             db.memoDao().clear()
@@ -179,6 +181,7 @@ class LedgerRepository(
             db.memoDao().insertAll(snapshot.memos.map { it.toEntity() })
             db.planningDao().insertBudgets(snapshot.budgets.map { it.toEntity() })
             db.planningDao().insertRules(snapshot.recurringRules.map { it.toEntity() })
+            db.wishDao().insertAll(snapshot.wishes.map { it.toEntity() })
         }
         preferences.edit().remove(LAST_ACCOUNT_ID).apply()
     }

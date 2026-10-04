@@ -48,4 +48,5 @@ data class LedgerSnapshot(
     val memos: List<Memo> = emptyList(),
     val budgets: List<Budget> = emptyList(),
     val recurringRules: List<RecurringRule> = emptyList(),
+    val wishes: List<Wish> = emptyList(),
 )

@@ -9,6 +9,9 @@ fun validateSnapshot(snapshot: LedgerSnapshot) {
     validateIds(snapshot.assets.map { it.id })
     validateIds(snapshot.memos.map { it.id })
     validateIds(snapshot.recurringRules.map { it.id })
+    validateIds(snapshot.wishes.map { it.id })
+    snapshot.wishes.forEach(::validateWish)
+    wishTotals(snapshot.wishes)
     snapshot.memos.forEach(::validateMemo)
     require(snapshot.budgets.map { it.month }.toSet().size == snapshot.budgets.size) { "备份包含重复月份预算。" }
     snapshot.budgets.forEach(::validateBudget)

@@ -20,7 +20,7 @@ fun UpdateDialog(model: UpdateViewModel, onNotifications: () -> Unit, onInstall:
     AlertDialog(onDismissRequest = model::close, title = { Text("应用更新 · ${model.versionName}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("有新版时通知你，在应用内下载，确认后覆盖安装。账本仍保存在本机。")
+                Text("有新版时通知你，在应用内下载，确认后覆盖安装。数据保存在本机。")
                 OutlinedTextField(source, { source = it }, label = { Text("更新地址") }, placeholder = { Text("开发者提供的 HTTPS 地址") }, modifier = Modifier.fillMaxWidth(), enabled = !state.busy, maxLines = 3)
                 if (state.source.isBlank()) Text("尚未接入发布源，当前无法获取新版。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {

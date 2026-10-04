@@ -8,6 +8,7 @@ import com.localledger.app.domain.Transaction
 import com.localledger.app.domain.Memo
 import com.localledger.app.domain.Budget
 import com.localledger.app.domain.RecurringRule
+import com.localledger.app.domain.Wish
 import com.localledger.app.domain.validateSnapshot
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -94,7 +95,7 @@ class BackupCodecTest {
     fun damagedOrUnsupportedBackupIsRejected() {
         rejects { BackupCodec.decode("{") }
         rejects { BackupCodec.decode(BackupCodec.encode(snapshot()) + " trailing") }
-        for (version in listOf<Any>(4, "1", true, 1.5)) {
+        for (version in listOf<Any>(5, "1", true, 1.5)) {
             val json = JSONObject(BackupCodec.encode(snapshot())).put("version", version)
             rejects { BackupCodec.decode(json.toString()) }
         }
@@ -142,5 +143,21 @@ class BackupCodecTest {
 
     private fun rejects(action: () -> Unit) {
         assertThrows(IllegalArgumentException::class.java) { action() }
+    }
+
+    @Test fun versionFourPreservesWishAmountsStatusHistoryAndReadsVersionThree() {
+        val original = snapshot().copy(wishes = listOf(
+            Wish("40000000-0000-4000-8000-000000000001", "相机", 9_007_199_254_740_993L, 12345, "keep\nnote", true, 10, 20, true),
+            Wish("40000000-0000-4000-8000-000000000002", "自行车", 50000, 20000, null, false, 10, 20),
+        ))
+        assertEquals(original, BackupCodec.decode(BackupCodec.encode(original)))
+        val legacy = JSONObject(BackupCodec.encode(original)).put("version", 3).apply { remove("wishes") }
+        assertEquals(original.copy(wishes = emptyList()), BackupCodec.decode(legacy.toString()))
+        val incomplete = JSONObject(BackupCodec.encode(original)).apply { remove("wishes") }
+        rejects { BackupCodec.decode(incomplete.toString()) }
+        val damaged = JSONObject(BackupCodec.encode(original))
+        damaged.getJSONArray("wishes").getJSONObject(0).put("savedMinor", "12345")
+        rejects { BackupCodec.decode(damaged.toString()) }
+        rejects { validateSnapshot(original.copy(wishes = original.wishes + original.wishes.first())) }
     }
 }

@@ -7,17 +7,22 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class AppSettings(
     val hideAmounts: Boolean = false, val appearance: String = "system", val dueReminders: Boolean = false,
-    val defaultHome: String = "home", val accent: String = "blue",
+    val defaultHome: String = "memos", val accent: String = "blue",
 )
 
 class SettingsRepository(context: Context) {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences("app-settings", Context.MODE_PRIVATE)
+    init {
+        if (!preferences.getBoolean("memo-first-home", false)) {
+            preferences.edit().putString("default-home", "memos").putBoolean("memo-first-home", true).apply()
+        }
+    }
     private val mutableSettings = MutableStateFlow(AppSettings(
         hideAmounts = preferences.getBoolean("hide-amounts", false),
         appearance = preferences.getString("appearance", "system") ?: "system",
         dueReminders = PlanningReminders.isEnabled(applicationContext),
-        defaultHome = preferences.getString("default-home", "home") ?: "home",
+        defaultHome = preferences.getString("default-home", "memos") ?: "memos",
         accent = preferences.getString("accent", "blue") ?: "blue",
     ))
     val settings = mutableSettings.asStateFlow()

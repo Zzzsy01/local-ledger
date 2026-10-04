@@ -68,7 +68,7 @@ fun MemosScreen(model: MemosViewModel, onAdd: () -> Unit, onEdit: (String) -> Un
         if (state.loading) item { Loading() }
         state.error?.let { item { Message(it, true) } }
         if (!state.loading && state.error == null && state.items.isEmpty()) item {
-            Message(if (state.total == 0) "想买的东西、待办事项、每月复盘……\n把容易忘记的事情留在这里。" else "没有符合条件的备忘录")
+            Message(if (state.total == 0) "待办事项、随手灵感、每月复盘……\n把容易忘记的事情留在这里。" else "没有符合条件的备忘录")
         }
         items(state.items, key = { it.id }) { memo ->
             Card(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clickable { onEdit(memo.id) }, shape = RoundedCornerShape(20.dp),
@@ -120,7 +120,7 @@ fun MemoEditorScreen(model: MemoEditorViewModel, onSavingChanged: (Boolean) -> U
             item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("标记为已完成"); Switch(draft.isDone, { value -> model.change { it.copy(isDone = value) } }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "标记为已完成" })
             } }
-            item { Text("编辑内容在当前草稿中保留，点击保存后写入账本。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+            item { Text("点击保存，留下这条备忘录。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         }
         draft.error?.let { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.error) }
         Button(model::save, enabled = enabled && !draft.saved && draft.title.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp)) { Text(if (draft.saving) "保存中…" else "保存备忘录") }

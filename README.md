@@ -1,8 +1,8 @@
 # 随手账与三图票据整理
 
-独立安卓记账应用 **随手账**：记账／备忘录双主页、本地收支与筛选、周／月／年／自定义图表报表、物品二手估值、预算与固定账目提醒、主题与默认主页设置、桌面快捷入口、CSV 模板导入与完整备份恢复，支持 Android 8.0 及以上。原网页票据工具继续保留。
+独立安卓应用 **随手账**：默认打开备忘录，备忘录与记账各自拥有导航；心愿清单统计预计价格、已攒金额和剩余目标。本地收支与筛选、周／月／年／自定义图表报表、物品二手估值、预算与固定账目提醒、主题与默认主页设置、桌面快捷入口、CSV 模板导入与完整备份恢复，支持 Android 8.0 及以上。原网页票据工具继续保留。
 
-源码：[Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。安卓安装包见 [最新版本](https://github.com/Zzzsy01/local-ledger/releases/latest)，使用和构建见 [android/README.md](android/README.md)。1.3.1 起预置 GitHub 更新源；在设置的「应用更新」里启用「自动检查并通知」并保存。旧版首次可手动覆盖安装，或填写 [更新说明](android/UPDATES.md) 中的地址。下载与安装仍由用户确认。
+源码：[Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。安卓安装包见 [最新版本](https://github.com/Zzzsy01/local-ledger/releases/latest)，使用和构建见 [android/README.md](android/README.md)。1.4.0 首次打开会启用 GitHub 自动更新检查，允许通知后可收到新版提醒；以后保留用户手动修改的开关。旧版首次可手动覆盖安装，或填写 [更新说明](android/UPDATES.md) 中的地址。下载与安装由用户确认。
 
 ## 网页票据工具
 

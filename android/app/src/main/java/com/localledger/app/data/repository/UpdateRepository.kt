@@ -28,6 +28,13 @@ class UpdateRepository(private val context: Context) {
     val versionCode: Long get() = if (Build.VERSION.SDK_INT >= 28) installed().longVersionCode else installed().versionCode.toLong()
     fun shouldCheckOnOpen(): Boolean = automatic && source.isNotBlank() && System.currentTimeMillis() - preferences.getLong("lastCheck", 0) >= DAY
 
+    fun initializeAutomaticUpdates(): Boolean {
+        if (preferences.getBoolean("automatic-default-initialized", false)) return false
+        configure(source.ifBlank { DEFAULT_SOURCE }, true)
+        preferences.edit().putBoolean("automatic-default-initialized", true).apply()
+        return true
+    }
+
     fun configure(value: String, auto: Boolean) {
         val url = value.trim()
         if (url.isNotEmpty()) requireHttps(url)

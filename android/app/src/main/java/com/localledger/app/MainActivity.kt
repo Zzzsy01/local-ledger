@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        if (!allowed) Toast.makeText(this, "通知未开启；固定账目和更新仍可在应用内查看。", Toast.LENGTH_LONG).show()
+        if (!allowed) Toast.makeText(this, "通知未开启；仍可在应用内查看提醒和更新。", Toast.LENGTH_LONG).show()
     }
     private fun requestNotifications() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -151,11 +151,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as LedgerApplication
+        val updatesEnabled = app.updateRepository.initializeAutomaticUpdates()
         if (app.updateRepository.automatic && getSystemService(android.app.job.JobScheduler::class.java).getPendingJob(1101) == null) {
             app.updateRepository.configure(app.updateRepository.source, true)
         }
         if (intent.action == UpdateCheckJob.ACTION_UPDATES) { updates.open(); updates.check() }
         else updates.checkOnOpen()
+        if (updatesEnabled && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         if (intent.action == PlanningReminderJob.ACTION_PLANNING) requestedRoute = "planning"
         shortcutRoute(intent)?.let { requestedRoute = it }
         lifecycleScope.launch(Dispatchers.IO) {
@@ -178,6 +182,7 @@ class MainActivity : ComponentActivity() {
                                 repository = repository,
                                 assetRepository = (application as LedgerApplication).assetRepository,
                                 memoRepository = app.memoRepository,
+                                wishRepository = app.wishRepository,
                                 planningRepository = app.planningRepository,
                                 settingsRepository = app.settingsRepository,
                                 importRepository = app.importRepository,
@@ -213,8 +218,8 @@ class MainActivity : ComponentActivity() {
                     state.pendingRestore?.let { snapshot ->
                         if (!state.busy) AlertDialog(
                             onDismissRequest = host::cancelRestore,
-                            title = { Text("恢复完整账本？") },
-                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目。恢复会替换当前全部数据；旧备份未包含的内容也会清空，建议先导出当前账本。") },
+                            title = { Text("恢复完整备份？") },
+                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.wishes.count { !it.isDeleted }} 个心愿、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目。恢复会替换当前全部数据；旧备份未包含的心愿及其他内容也会清空，建议先导出完整备份。") },
                             confirmButton = { TextButton(onClick = host::confirmRestore) { Text("替换并恢复") } },
                             dismissButton = { TextButton(onClick = host::cancelRestore) { Text("取消") } },
                         )

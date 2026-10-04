@@ -8,13 +8,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
 
-@Database(entities = [CategoryEntity::class, AccountEntity::class, TransactionEntity::class, AssetEntity::class, MemoEntity::class, BudgetEntity::class, RecurringRuleEntity::class], version = 3, exportSchema = true, autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
+@Database(entities = [CategoryEntity::class, AccountEntity::class, TransactionEntity::class, AssetEntity::class, MemoEntity::class, BudgetEntity::class, RecurringRuleEntity::class, WishEntity::class], version = 4, exportSchema = true, autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)])
 @TypeConverters(AssetConverters::class)
 abstract class LedgerDatabase : RoomDatabase() {
     abstract fun ledgerDao(): LedgerDao
     abstract fun assetDao(): AssetDao
     abstract fun memoDao(): MemoDao
     abstract fun planningDao(): PlanningDao
+    abstract fun wishDao(): WishDao
 
     suspend fun seedDefaults() = withTransaction {
         val dao = ledgerDao()

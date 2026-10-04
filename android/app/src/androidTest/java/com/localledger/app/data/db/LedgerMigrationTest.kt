@@ -11,6 +11,32 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LedgerMigrationTest {
     @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), LedgerDatabase::class.java)
+
+    @Test fun migrationFromThreePreservesSevenTablesAndAddsEmptyWishlist() {
+        val name = "migration-wishes-test.db"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val tables = listOf("accounts", "categories", "transactions", "assets", "memos", "budgets", "recurring_rules")
+        fun rows(database: androidx.sqlite.db.SupportSQLiteDatabase, table: String) = database.query("SELECT * FROM $table ORDER BY 1").use { cursor ->
+            buildList { while (cursor.moveToNext()) add((0 until cursor.columnCount).map { if (cursor.isNull(it)) null else cursor.getString(it) }) }
+        }
+        try {
+            val previous = helper.createDatabase(name, 3)
+            previous.execSQL("INSERT INTO accounts VALUES ('00000000-0000-4000-8000-000000000001', 'cash', 0)")
+            previous.execSQL("INSERT INTO categories VALUES ('10000000-0000-4000-8000-000000000001', 'food', 0, NULL, 0, 1)")
+            previous.execSQL("INSERT INTO transactions VALUES ('20000000-0000-4000-8000-000000000001', 12345, 0, '10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'keep', 10, 10, 20, 1, 8, 'csv-kept')")
+            previous.execSQL("INSERT INTO assets VALUES ('30000000-0000-4000-8000-000000000001', 'camera', 'photo', 30000, 15000, 10, '10000,20000', 'keep', 10, 20, 0)")
+            previous.execSQL("INSERT INTO memos VALUES ('40000000-0000-4000-8000-000000000001', 'memo', 'keep', 1, 1, 10, 20, 0)")
+            previous.execSQL("INSERT INTO budgets VALUES ('2026-10', 200000, 20)")
+            previous.execSQL("INSERT INTO recurring_rules VALUES ('50000000-0000-4000-8000-000000000001', 'rent', 2000, 0, '10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 30, 31, 'keep', 10, 20, 1)")
+            val original = tables.associateWith { rows(previous, it) }
+            previous.close()
+            helper.runMigrationsAndValidate(name, 4, true).apply {
+                tables.forEach { assertEquals(original[it], rows(this, it)) }
+                assertTrue(rows(this, "wishes").isEmpty())
+                close()
+            }
+        } finally { context.deleteDatabase(name) }
+    }
     @Test fun migrationFromOneRetainsAccountsCategoriesAndDeletedHistory() {
         val name = "migration-assets-test.db"
         val context = InstrumentationRegistry.getInstrumentation().targetContext
