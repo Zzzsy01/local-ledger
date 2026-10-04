@@ -159,6 +159,9 @@ fun LedgerApp(
                     },
                     actions = {
                         if (!editing) {
+                            if (route == "wishes") IconButton(onClick = { navigation.navigate("wish/add") }) {
+                                Icon(Icons.Default.Add, "添加心愿")
+                            }
                             IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "备份与恢复") }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(text = { Text("设置") }, onClick = { menuOpen = false; openMain("settings") })
@@ -194,11 +197,11 @@ fun LedgerApp(
                 }
             },
             floatingActionButton = {
-                if (route in listOf("home", "assets", "memos", "wishes")) ExtendedFloatingActionButton(
-                    modifier = Modifier.semantics { contentDescription = when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; "wishes" -> "添加心愿"; else -> "记一笔" } },
-                    onClick = { navigation.navigate(when(route) { "assets" -> "asset/add"; "memos" -> "memo/add"; "wishes" -> "wish/add"; else -> "add" }) },
+                if (route in listOf("home", "assets", "memos")) ExtendedFloatingActionButton(
+                    modifier = Modifier.semantics { contentDescription = when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" } },
+                    onClick = { navigation.navigate(when(route) { "assets" -> "asset/add"; "memos" -> "memo/add"; else -> "add" }) },
                     icon = { Icon(Icons.Default.Add, null) },
-                    text = { Text(when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; "wishes" -> "添加心愿"; else -> "记一笔" }) },
+                    text = { Text(when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" }) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 )
