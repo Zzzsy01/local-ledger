@@ -1,6 +1,6 @@
 # 应用更新发布
 
-源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.3.2（versionCode 6），1.3.1 起预置更新地址：
+源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.3.3（versionCode 7），1.3.1 起预置更新地址：
 
 ```text
 https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
@@ -13,6 +13,8 @@ https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
 3. 已安装 1.3.0 或更早版本的手机，可以填写上述地址并保存，也可以从 [最新版本](https://github.com/Zzzsy01/local-ledger/releases/latest) 下载 APK 手动覆盖安装一次。后续沿用已保存的更新设置。
 
 自动检查通过 Android JobScheduler 每日执行，并在应用打开时补查。系统省电策略可能推迟检查；不能静默安装。Android 13 及以上需要通知权限。关闭通知仍可手动检查。
+
+1.3.3 起，系统强行停止应用并取消后台任务后，下次打开应用会按已保存的自动检查开关恢复任务。
 
 账本保存在本机，更新请求不携带账本。覆盖安装要求同包名、同签名与递增版本号；不要卸载旧版。当前交付仍使用原 Debug 签名，换正式签名前应先明确升级路径。
 

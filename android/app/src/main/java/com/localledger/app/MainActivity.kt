@@ -150,6 +150,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val app = application as LedgerApplication
+        if (app.updateRepository.automatic && getSystemService(android.app.job.JobScheduler::class.java).getPendingJob(1101) == null) {
+            app.updateRepository.configure(app.updateRepository.source, true)
+        }
         if (intent.action == UpdateCheckJob.ACTION_UPDATES) { updates.open(); updates.check() }
         else updates.checkOnOpen()
         if (intent.action == PlanningReminderJob.ACTION_PLANNING) requestedRoute = "planning"
@@ -157,7 +161,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             getSystemService(ShortcutManager::class.java).dynamicShortcuts = listOf(recordShortcut("entry"), recordShortcut("memo"))
         }
-        val app = application as LedgerApplication
         val repository = app.repository
         setContent {
             val state by host.state.collectAsStateWithLifecycle()
