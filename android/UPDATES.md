@@ -1,6 +1,6 @@
 # 应用更新发布
 
-源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.3.1（versionCode 5）预置更新地址：
+源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.3.2（versionCode 6），1.3.1 起预置更新地址：
 
 ```text
 https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
@@ -35,5 +35,7 @@ https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
 每个 Release 包含 `ledger-版本.apk` 和 `update.json`。固定更新地址总是读取最新版的 JSON；JSON 内的 APK 地址使用具体版本标签，避免手机在跨版本发布时下载到不同版本的文件。仅推送源码不会更新手机，需要完成 Release 发布。
 
 客户端限制版本信息为 64 Ki 字符、安装包为 128 MiB；下载后核对 SHA-256、包名、版本与本机签名，失败时不调用安装器。发布者的原始签名密钥必须自行保留，不提交 GitHub。
+
+首次授权安装来源可能使系统重启应用；1.3.2 起再次检查更新时会重新校验本机已下载 APK，与当前清单一致则直接继续安装。缓存不匹配当前版本时重新下载。
 
 平台依据：[GitHub 固定版本附件地址](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)、[Android PackageInstaller](https://developer.android.com/reference/android/content/pm/PackageInstaller)、[JobScheduler](https://developer.android.com/reference/android/app/job/JobScheduler)。

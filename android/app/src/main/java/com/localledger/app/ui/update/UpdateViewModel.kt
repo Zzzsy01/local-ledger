@@ -32,8 +32,9 @@ class UpdateViewModel(private val repository: UpdateRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val update = repository.check()
-                mutable.update { it.copy(update = update, visible = it.visible || update != null,
-                    message = if (update == null) "当前已是最新版本" else null) }
+                val file = update?.let { repository.downloaded(it) }
+                mutable.update { it.copy(update = update, downloaded = file, visible = it.visible || update != null,
+                    message = if (update == null) "当前已是最新版本" else if (file != null) "校验通过，可以覆盖安装并保留数据" else null) }
             } catch (error: Exception) {
                 val message = error.displayMessage()
                 if (!silent) mutable.update { it.copy(message = message) }

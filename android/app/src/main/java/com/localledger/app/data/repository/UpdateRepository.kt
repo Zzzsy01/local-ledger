@@ -73,6 +73,33 @@ class UpdateRepository(private val context: Context) {
     }
 
     @Suppress("DEPRECATION")
+    private fun verifyArchive(file: File, update: AppUpdate) {
+        val info = requireNotNull(context.packageManager.getPackageArchiveInfo(file.path, PackageManager.GET_SIGNATURES)) { "下载的文件不是有效安装包。" }
+        val downloadedVersion = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+        require(info.packageName == context.packageName && downloadedVersion == update.versionCode) { "安装包应用或版本不匹配。" }
+        val expected = installed().signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+        val actual = info.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+        require(expected.isNotEmpty() && expected == actual) { "安装包签名不同，无法保留原数据覆盖安装。" }
+    }
+
+    suspend fun downloaded(update: AppUpdate): File? = withContext(Dispatchers.IO) {
+        val file = File(context.cacheDir, "updates/update.apk")
+        if (!file.isFile || file.length() > 128L * 1024 * 1024) return@withContext null
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                ensureActive()
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        if (digest.digest().joinToString("") { "%02x".format(it) } != update.sha256) return@withContext null
+        verifyArchive(file, update)
+        file
+    }
+
     suspend fun download(update: AppUpdate): File = withContext(Dispatchers.IO) {
         require(update.versionCode > versionCode) { "只允许安装更新的版本。" }
         val folder = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -96,12 +123,7 @@ class UpdateRepository(private val context: Context) {
             } }
             val sha = digest.digest().joinToString("") { "%02x".format(it) }
             require(sha == update.sha256) { "安装包校验失败，请联系发布者。" }
-            val info = requireNotNull(context.packageManager.getPackageArchiveInfo(partial.path, PackageManager.GET_SIGNATURES)) { "下载的文件不是有效安装包。" }
-            val downloadedVersion = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
-            require(info.packageName == context.packageName && downloadedVersion == update.versionCode) { "安装包应用或版本不匹配。" }
-            val expected = installed().signatures?.map { it.toCharsString() }?.toSet().orEmpty()
-            val actual = info.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
-            require(expected.isNotEmpty() && expected == actual) { "安装包签名不同，无法保留原数据覆盖安装。" }
+            verifyArchive(partial, update)
             check(!file.exists() || file.delete()) { "无法替换旧安装包。" }
             check(partial.renameTo(file)) { "无法保存安装包。" }
             file
