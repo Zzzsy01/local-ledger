@@ -29,7 +29,7 @@ internal fun MonthPicker(month: YearMonth, onChange: (Long) -> Unit) {
 }
 
 @Composable
-internal fun amountColor(type: Int): Color = if (type == INCOME) MaterialTheme.colorScheme.primary else Color(0xFF94613B)
+internal fun amountColor(type: Int): Color = if (type == INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
 
 @Composable
 internal fun Loading() {

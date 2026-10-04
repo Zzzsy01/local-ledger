@@ -2,6 +2,7 @@ package com.localledger.app.ui.stats
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,8 +40,12 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
     val kind = if (state.type == INCOME) "收入" else "支出"
     val hidden = LocalHideAmounts.current
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item { Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("收支报表", style = MaterialTheme.typography.headlineSmall)
+            Text("看清变化，找到花钱的方向", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } }
         item {
-            SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+            SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
                 ReportPeriod.entries.forEachIndexed { index, period ->
                     SegmentedButton(selected = state.period == period,
                         onClick = { if (period == ReportPeriod.CUSTOM) customOpen = true else model.setPeriod(period) },
@@ -58,7 +63,7 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
                 if (state.period != ReportPeriod.CUSTOM) TextButton(onClick = { model.changePeriod(1) }) { Text("下一${periodUnit(state.period)}") }
             }
         }
-        item { Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(EXPENSE to "支出", INCOME to "收入").forEach { (type, label) ->
                 FilterChip(state.type == type, { model.setType(type) }, label = { Text(label) })
             }
@@ -137,9 +142,9 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
 
 @Composable
 private fun ReportOverview(state: StatsState, total: Long, kind: String) {
-    Card(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+    Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("本期结余", style = MaterialTheme.typography.labelLarge)
             Text("¥${visibleAmount(state.summary.income - state.summary.expense)}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -164,8 +169,9 @@ private fun ReportOverview(state: StatsState, total: Long, kind: String) {
 
 @Composable
 private fun ReportCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(.7.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             content()

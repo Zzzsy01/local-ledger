@@ -1,6 +1,8 @@
 package com.localledger.app.ui.wishes
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,10 +14,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.localledger.app.R
 import com.localledger.app.domain.Wish
 import com.localledger.app.domain.formatAmount
 import com.localledger.app.domain.parseAmount
@@ -24,7 +30,6 @@ import com.localledger.app.ui.common.Loading
 import com.localledger.app.ui.common.Message
 import com.localledger.app.ui.common.visibleAmount
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -34,56 +39,135 @@ fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> 
     val hidden = LocalHideAmounts.current
     var deleting by remember { mutableStateOf<Wish?>(null) }
     var savingForId by rememberSaveable { mutableStateOf<String?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 88.dp)) {
-        item { Card(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 32.dp)) {
+        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("想买的东西", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("为喜欢的生活，慢慢攒一点", style = MaterialTheme.typography.bodySmall)
-                    }
-                    TextButton(onClick = onAdd) { Text("添加心愿") }
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(painterResource(R.drawable.ic_ui_heart), contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Text("想买的东西", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
-                Text("还需要攒", style = MaterialTheme.typography.labelLarge)
-                Text("¥${visibleAmount(state.totals.remainingMinor)}", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text("待买预算 ¥${visibleAmount(state.totals.targetMinor)} · ${state.totals.active} 个心愿", style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("还需要攒", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .7f))
+                    Text("¥${visibleAmount(state.totals.remainingMinor)}", style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    WishSummaryMetric("待买预算", "¥${visibleAmount(state.totals.targetMinor)}", Modifier.weight(1.5f))
+                    WishSummaryMetric("想买", "${state.totals.active} 个", Modifier.weight(1f))
+                    WishSummaryMetric("已达成", "${state.totals.purchased} 个", Modifier.weight(1f))
+                }
                 if (!hidden) {
-                    LinearProgressIndicator(progress = { state.totals.progress }, modifier = Modifier.fillMaxWidth().height(8.dp))
-                    Text("整体准备进度 ${(state.totals.progress * 100).toInt()}% · 已达成 ${state.totals.purchased} 个", style = MaterialTheme.typography.bodySmall)
-                } else Text("已达成 ${state.totals.purchased} 个", style = MaterialTheme.typography.bodySmall)
-                Text("每一步积累，都离心愿更近。", style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(progress = { state.totals.progress },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)),
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = .12f))
+                }
+                Text("每一步积累，都离心愿更近。", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .7f))
             }
         } }
-        item { Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("active" to "想买", "purchased" to "已达成").forEach { (value, label) ->
-                FilterChip(filter == value, { model.filter(value) }, label = { Text(label) })
+                FilterChip(filter == value, { model.filter(value) }, label = { Text(label) },
+                    shape = RoundedCornerShape(14.dp), modifier = Modifier.heightIn(min = 48.dp),
+                    border = BorderStroke(.7.dp, if (filter == value) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant),
+                    leadingIcon = if (value == "purchased") {
+                        { Icon(painterResource(R.drawable.ic_ui_check), contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null)
             }
         } }
         if (state.loading) item { Loading() }
         state.error?.let { item { Message(it, true) } }
         if (!state.loading && state.error == null && state.items.isEmpty()) item {
-            Message(if (filter == "active") "写下第一个心愿和预计价格，\n让每一次积累都有方向。" else "买到喜欢的东西后，在这里留下一份成就。")
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))) {
+                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    WishIcon(purchased = filter == "purchased")
+                    Text(if (filter == "active") "给喜欢的东西留个位置" else "收藏你的每一次达成",
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(if (filter == "active") "写下第一个心愿和预计价格，\n让每一次积累都有方向。" else "买到喜欢的东西后，在这里留下一份成就。",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (filter == "active") FilledTonalButton(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Icon(painterResource(R.drawable.ic_ui_plus), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("添加心愿")
+                    }
+                }
+            }
         }
         items(state.items, key = { it.id }) { wish ->
-            Card(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clickable { onEdit(wish.id) }, shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(wish.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(if (wish.isPurchased) "已买到" else "心愿", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+            var menuExpanded by remember(wish.id) { mutableStateOf(false) }
+            Card(Modifier.fillMaxWidth().clickable { onEdit(wish.id) }, shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        WishIcon(wish.isPurchased)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(wish.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(if (wish.isPurchased) "已买到" else "慢慢攒，慢慢靠近", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }, enabled = !busy) {
+                                Icon(painterResource(R.drawable.ic_ui_more), contentDescription = "心愿操作",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(text = { Text("编辑心愿") }, onClick = { menuExpanded = false; onEdit(wish.id) })
+                                DropdownMenuItem(text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(painterResource(R.drawable.ic_ui_trash), contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
+                                    onClick = { menuExpanded = false; deleting = wish })
+                            }
+                        }
                     }
-                    Text("预计 ¥${visibleAmount(wish.targetMinor)} · 已攒 ¥${visibleAmount(wish.savedMinor)}", style = MaterialTheme.typography.bodyMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(if (wish.isPurchased) "预计价格" else "还差", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("¥${visibleAmount(if (wish.isPurchased) wish.targetMinor else wish.remainingMinor)}",
+                            style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("预计 ¥${visibleAmount(wish.targetMinor)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("已攒 ¥${visibleAmount(wish.savedMinor)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if (!wish.isPurchased) {
-                        if (!hidden) LinearProgressIndicator(progress = { wish.progress }, modifier = Modifier.fillMaxWidth().height(6.dp))
-                        Text(if (!hidden && wish.remainingMinor == 0L) "已经攒够了，准备迎接它吧！" else "还差 ¥${visibleAmount(wish.remainingMinor)}",
-                            color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                        if (!hidden) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LinearProgressIndicator(progress = { wish.progress },
+                                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(6.dp)),
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = .1f))
+                            Text("${(wish.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
                     }
-                    if (!wish.note.isNullOrBlank()) Text(wish.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        if (!wish.isPurchased) TextButton(onClick = { savingForId = wish.id }, enabled = !busy) { Text("更新攒钱") }
-                        TextButton(onClick = { model.purchase(wish) }, enabled = !busy) { Text(if (wish.isPurchased) "移回想买" else "买到啦") }
-                        TextButton(onClick = { deleting = wish }, enabled = !busy) { Text("删除") }
+                    if (!wish.note.isNullOrBlank()) Text(wish.note, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!wish.isPurchased) {
+                            FilledTonalButton(onClick = { savingForId = wish.id }, enabled = !busy,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) {
+                                Text("更新攒钱")
+                            }
+                            TextButton(onClick = { model.purchase(wish) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Icon(painterResource(R.drawable.ic_ui_check), contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("买到啦")
+                            }
+                        } else FilledTonalButton(onClick = { model.purchase(wish) }, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) {
+                            Text("移回想买")
+                        }
                     }
                 }
             }
@@ -115,6 +199,26 @@ fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> 
 }
 
 @Composable
+private fun WishSummaryMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .65f))
+        Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun WishIcon(purchased: Boolean) {
+    Box(Modifier.size(40.dp).background(
+        if (purchased) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+        Icon(painterResource(if (purchased) R.drawable.ic_ui_check else R.drawable.ic_ui_goal), contentDescription = null,
+            tint = if (purchased) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
 fun WishEditorScreen(model: WishEditorViewModel, onSavingChanged: (Boolean) -> Unit, onSaved: () -> Unit) {
     val draft by model.draft.collectAsStateWithLifecycle()
     BackHandler(draft.saving) { }
@@ -123,22 +227,41 @@ fun WishEditorScreen(model: WishEditorViewModel, onSavingChanged: (Boolean) -> U
     LaunchedEffect(draft.saved) { if (draft.saved) onSaved() }
     val enabled = !draft.loading && !draft.saving
     Column(Modifier.fillMaxSize().imePadding()) {
-        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp)) {
             if (draft.loading) item { Loading() }
-            item { Text("给喜欢的东西一个目标", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-            item { OutlinedTextField(draft.name, { value -> model.change { it.copy(name = value) } }, Modifier.fillMaxWidth(),
-                label = { Text("想买什么") }, placeholder = { Text("例如，相机、自行车或一台新电脑") }, singleLine = true, enabled = enabled) }
-            item { OutlinedTextField(draft.target, { value -> model.change { it.copy(target = value) } }, Modifier.fillMaxWidth(),
-                label = { Text("预计价格（元）") }, singleLine = true, enabled = enabled, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)) }
-            item { OutlinedTextField(draft.savedAmount, { value -> model.change { it.copy(savedAmount = value) } }, Modifier.fillMaxWidth(),
-                label = { Text("已攒金额（元）") }, singleLine = true, enabled = enabled, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)) }
-            item { OutlinedTextField(draft.note, { value -> model.change { it.copy(note = value) } }, Modifier.fillMaxWidth(),
-                label = { Text("为什么想买（选填）") }, minLines = 3, enabled = enabled) }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    WishIcon(purchased = false)
+                    Text("给喜欢的东西一个目标", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedTextField(draft.name, { value -> model.change { it.copy(name = value) } }, Modifier.fillMaxWidth(),
+                            label = { Text("想买什么") }, placeholder = { Text("例如，相机、自行车或一台新电脑") },
+                            singleLine = true, enabled = enabled, shape = RoundedCornerShape(14.dp))
+                        OutlinedTextField(draft.target, { value -> model.change { it.copy(target = value) } }, Modifier.fillMaxWidth(),
+                            label = { Text("预计价格（元）") }, singleLine = true, enabled = enabled, shape = RoundedCornerShape(14.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                        OutlinedTextField(draft.savedAmount, { value -> model.change { it.copy(savedAmount = value) } }, Modifier.fillMaxWidth(),
+                            label = { Text("已攒金额（元）") }, singleLine = true, enabled = enabled, shape = RoundedCornerShape(14.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                        OutlinedTextField(draft.note, { value -> model.change { it.copy(note = value) } }, Modifier.fillMaxWidth(),
+                            label = { Text("为什么想买（选填）") }, minLines = 3, enabled = enabled, shape = RoundedCornerShape(14.dp))
+                    }
+                }
+            }
             item { Text("价格可以是大致预算，攒钱进度由你更新。买到后标记达成，给自己留下一份成就。",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         draft.error?.let { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.error) }
         Button(model::save, enabled = enabled && !draft.saved && draft.name.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp)) { Text(if (draft.saving) "保存中…" else "保存心愿") }
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).height(52.dp),
+            shape = RoundedCornerShape(16.dp)) { Text(if (draft.saving) "保存中…" else "保存心愿") }
     }
 }

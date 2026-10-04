@@ -2,16 +2,6 @@ package com.localledger.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,6 +11,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -40,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +47,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.localledger.app.R
 import com.localledger.app.data.repository.AssetRepository
 import com.localledger.app.ui.assets.*
 import com.localledger.app.ui.common.LocalHideAmounts
@@ -128,10 +123,16 @@ fun LedgerApp(
             topBar = {
                 TopAppBar(
                     title = {
-                        if (mainRoute) SingleChoiceSegmentedButtonRow(Modifier.width(224.dp)) {
+                        if (mainRoute) SingleChoiceSegmentedButtonRow(Modifier.width(208.dp)) {
                             listOf(true to "备忘录", false to "记账").forEachIndexed { index, (mode, label) ->
                                 SegmentedButton(selected = memoMode == mode, onClick = { memoMode = mode },
-                                    shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {}) { Text(label, maxLines = 1) }
+                                    shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {},
+                                    border = SegmentedButtonDefaults.borderStroke(color = Color.Transparent),
+                                    colors = SegmentedButtonDefaults.colors(
+                                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        activeContentColor = MaterialTheme.colorScheme.primary,
+                                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
+                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text(label, maxLines = 1) }
                             }
                         } else Text(when (route) {
                         "assets" -> "身家"
@@ -154,15 +155,15 @@ fun LedgerApp(
                     }) },
                     navigationIcon = {
                         if (!mainRoute) IconButton(enabled = !entrySaving, onClick = { navigation.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(painterResource(R.drawable.ic_ui_back), contentDescription = "返回")
                         }
                     },
                     actions = {
                         if (!editing) {
                             if (route == "wishes") IconButton(onClick = { navigation.navigate("wish/add") }) {
-                                Icon(Icons.Default.Add, "添加心愿")
+                                Icon(painterResource(R.drawable.ic_ui_plus), "添加心愿")
                             }
-                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "备份与恢复") }
+                            IconButton(onClick = { menuOpen = true }) { Icon(painterResource(R.drawable.ic_ui_more), "更多功能") }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(text = { Text("设置") }, onClick = { menuOpen = false; openMain("settings") })
                                 DropdownMenuItem(text = { Text(if (memoMode) "切换到记账" else "切换到备忘录") }, onClick = { menuOpen = false; memoMode = !memoMode })
@@ -173,25 +174,28 @@ fun LedgerApp(
                             }
                         }
                     },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
             },
             bottomBar = {
-                if (mainRoute) NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                if (mainRoute) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                     val pages = if (memoMode) listOf("memos" to "备忘录", "wishes" to "心愿", "settings" to "设置")
                         else listOf("home" to "账单", "assets" to "身家", "stats" to "报表", "settings" to "设置")
                     pages.forEach { (destination, label) ->
                         NavigationBarItem(
                             selected = route == destination,
                             onClick = { openMain(destination) },
-                            icon = { Icon(when (destination) {
-                                "home" -> Icons.Default.Home
-                                "memos" -> Icons.AutoMirrored.Filled.List
-                                "wishes" -> Icons.Default.Favorite
-                                "assets" -> Icons.Default.AccountBox
-                                "stats" -> Icons.Default.DateRange
-                                else -> Icons.Default.Settings
-                            }, contentDescription = null) },
+                            icon = { Icon(painterResource(when (destination) {
+                                "home" -> R.drawable.ic_ui_wallet
+                                "memos" -> R.drawable.ic_ui_notebook
+                                "wishes" -> R.drawable.ic_ui_heart
+                                "assets" -> R.drawable.ic_ui_package
+                                "stats" -> R.drawable.ic_ui_report
+                                else -> R.drawable.ic_ui_settings
+                            }), contentDescription = null) },
                             label = { Text(label) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primaryContainer),
                         )
                     }
                 }
@@ -200,7 +204,7 @@ fun LedgerApp(
                 if (route in listOf("home", "assets", "memos")) ExtendedFloatingActionButton(
                     modifier = Modifier.semantics { contentDescription = when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" } },
                     onClick = { navigation.navigate(when(route) { "assets" -> "asset/add"; "memos" -> "memo/add"; else -> "add" }) },
-                    icon = { Icon(Icons.Default.Add, null) },
+                    icon = { Icon(painterResource(R.drawable.ic_ui_plus), null) },
                     text = { Text(when(route) { "assets" -> "添置物品"; "memos" -> "新建备忘录"; else -> "记一笔" }) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,

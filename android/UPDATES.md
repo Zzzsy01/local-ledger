@@ -1,6 +1,6 @@
 # 应用更新发布
 
-源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.4.0（versionCode 8），1.3.1 起预置更新地址：
+源码与安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前版本 1.4.1（versionCode 9），1.3.1 起预置更新地址：
 
 ```text
 https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json
