@@ -15,19 +15,17 @@ import java.time.LocalDate
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun LifeCreateDialog(onDismiss: () -> Unit, onSelect: (LifeKind) -> Unit, onWishes: () -> Unit,
-    onTasks: () -> Unit, onFocus: () -> Unit, onStudy: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("新建生活记录") }, text = {
+internal fun LifeCreateDialog(section: String, onDismiss: () -> Unit, onSelect: (LifeKind) -> Unit, onFocus: () -> Unit, onStudy: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("新建${section}") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("计划")
-            FlowRow { TextButton(onWishes) { Text("购物与存钱") }; TextButton(onTasks) { Text("待办事项") }
-                lifePlanKinds.forEach { kind -> TextButton({ onSelect(kind) }) { Text(kind.label) } } }
-            Text("时间")
-            FlowRow { lifeTimeKinds.forEach { kind -> TextButton({ onSelect(kind) }) { Text(kind.label) } } }
-            Text("记录")
-            FlowRow { listOf(LifeKind.HABIT, LifeKind.MOOD, LifeKind.DIARY, LifeKind.SUBSCRIPTION).forEach { kind ->
-                TextButton({ onSelect(kind) }) { Text(kind.label) } }
-                TextButton(onFocus) { Text("番茄钟") }; TextButton(onStudy) { Text("单词卡") } }
+            when (section) {
+                "计划" -> FlowRow { lifePlanKinds.forEach { kind -> TextButton({ onSelect(kind) }) { Text(kind.label) } } }
+                "日期" -> FlowRow { (lifeTimeKinds + LifeKind.SUBSCRIPTION).forEach { kind -> TextButton({ onSelect(kind) }) { Text(kind.label) } } }
+                "学习" -> FlowRow { TextButton(onFocus) { Text("番茄钟") }; TextButton(onStudy) { Text("单词卡") } }
+                else -> FlowRow { listOf(LifeKind.HABIT, LifeKind.MOOD, LifeKind.DIARY).forEach { kind ->
+                    TextButton({ onSelect(kind) }) { Text(kind.label) }
+                } }
+            }
         }
     }, confirmButton = { TextButton(onDismiss) { Text("取消") } })
 }

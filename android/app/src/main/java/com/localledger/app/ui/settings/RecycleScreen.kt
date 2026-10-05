@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RecycleScreen(repository: RecycleRepository, memoMode: Boolean) {
     val all by repository.items.collectAsStateWithLifecycle(emptyList())
-    val rows = all.filter { if (memoMode) it.type in listOf("备忘录", "生活", "心愿", "专注", "单词") else it.type in listOf("账目", "物品") }
+    val rows = all.filter { if (memoMode) it.type in listOf("备忘录", "生活", "心愿", "专注", "单词", "物品") else it.type in listOf("账目", "物品") }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }

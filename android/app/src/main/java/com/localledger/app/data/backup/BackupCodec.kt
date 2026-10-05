@@ -20,7 +20,7 @@ object BackupCodec {
     fun encode(snapshot: LedgerSnapshot): String {
         validateSnapshot(snapshot)
         return JSONObject()
-            .put("version", 5)
+            .put("version", 6)
             .put("categories", JSONArray(snapshot.categories.map {
                 JSONObject().put("id", it.id).put("name", it.name).put("type", it.type)
                     .put("icon", it.icon ?: JSONObject.NULL).put("sortOrder", it.sortOrder)
@@ -47,6 +47,7 @@ object BackupCodec {
                     .put("quantity", it.quantity).put("acquisition", it.acquisition).put("purchaseDate", it.purchaseDate ?: JSONObject.NULL)
                     .put("channel", it.channel ?: JSONObject.NULL).put("location", it.location ?: JSONObject.NULL).put("warrantyUntil", it.warrantyUntil ?: JSONObject.NULL)
                     .put("status", it.status).put("disposedDate", it.disposedDate ?: JSONObject.NULL).put("photoPaths", JSONArray(it.photoPaths))
+                    .put("tags", JSONArray(it.tags)).put("serialNumber", it.serialNumber ?: JSONObject.NULL).put("isFavorite", it.isFavorite).put("isValueKnown", it.isValueKnown)
             }))
             .put("memos", JSONArray(snapshot.memos.map {
                 JSONObject().put("id", it.id).put("title", it.title).put("content", it.content)
@@ -93,6 +94,12 @@ object BackupCodec {
             .put("paymentCandidates", JSONArray(snapshot.paymentCandidates.map {
                 JSONObject().put("id", it.id).put("source", it.source).put("text", it.text).put("capturedAt", it.capturedAt).put("isDeleted", it.isDeleted)
             }))
+            .put("assetRecords", JSONArray(snapshot.assetRecords.map {
+                JSONObject().put("id", it.id).put("assetId", it.assetId).put("kind", it.kind).put("occurredAt", it.occurredAt)
+                    .put("content", it.content).put("fromLocation", it.fromLocation ?: JSONObject.NULL).put("toLocation", it.toLocation ?: JSONObject.NULL)
+                    .put("amountMinor", it.amountMinor ?: JSONObject.NULL).put("previousAmountMinor", it.previousAmountMinor ?: JSONObject.NULL)
+                    .put("createdAt", it.createdAt).put("updatedAt", it.updatedAt)
+            }))
             .put("assetPhotos", JSONObject(snapshot.assetPhotos)).toString()
     }
 
@@ -102,7 +109,7 @@ object BackupCodec {
             val json = input.nextValue()
             require(json is JSONObject && input.nextClean() == '\u0000') { "备份必须是一个完整的 JSON 对象。" }
             val version = json.integer("version")
-            require(version in 1..5) { "不支持此备份版本。" }
+            require(version in 1..6) { "不支持此备份版本。" }
             return LedgerSnapshot(
                 categories = json.objects("categories").map {
                     Category(it.string("id"), it.string("name"), it.integer("type"),
@@ -140,7 +147,10 @@ object BackupCodec {
                         purchaseDate = if (version < 5) null else it.nullableString("purchaseDate"), channel = if (version < 5) null else it.nullableString("channel"),
                         location = if (version < 5) null else it.nullableString("location"), warrantyUntil = if (version < 5) null else it.nullableString("warrantyUntil"),
                         status = if (version < 5) "持有中" else it.string("status"), disposedDate = if (version < 5) null else it.nullableString("disposedDate"),
-                        photoPaths = if (version < 5) emptyList() else it.strings("photoPaths"))
+                        photoPaths = if (version < 5) emptyList() else it.strings("photoPaths"),
+                        tags = if (version < 6) emptyList() else it.strings("tags", 12),
+                        serialNumber = if (version < 6) null else it.nullableString("serialNumber"),
+                        isFavorite = version >= 6 && it.boolean("isFavorite"), isValueKnown = version < 6 || it.boolean("isValueKnown"))
                 },
                 memos = if (version < 3) emptyList() else json.objects("memos").map {
                     Memo(it.string("id"), it.string("title"), it.string("content"), it.boolean("isPinned"),
@@ -183,6 +193,11 @@ object BackupCodec {
                 paymentCandidates = if (version < 5) emptyList() else json.objects("paymentCandidates").map {
                     PaymentCandidate(it.string("id"), it.string("source"), it.string("text"), it.wholeLong("capturedAt"), it.boolean("isDeleted"))
                 },
+                assetRecords = if (version < 6) emptyList() else json.objects("assetRecords").map {
+                    AssetRecord(it.string("id"), it.string("assetId"), it.string("kind"), it.wholeLong("occurredAt"), it.string("content"),
+                        it.nullableString("fromLocation"), it.nullableString("toLocation"), it.nullableLong("amountMinor"), it.nullableLong("previousAmountMinor"),
+                        it.wholeLong("createdAt"), it.wholeLong("updatedAt"))
+                },
                 assetPhotos = if (version < 5) emptyMap() else json.get("assetPhotos").let { photos ->
                     require(photos is JSONObject) { "照片附件必须是对象。" }
                     photos.keys().asSequence().associateWith { photos.string(it) }
@@ -195,9 +210,9 @@ object BackupCodec {
 
     private fun JSONObject.nullableLong(name: String): Long? = if (get(name) === JSONObject.NULL) null else wholeLong(name)
     private fun JSONObject.nullableInt(name: String): Int? = if (get(name) === JSONObject.NULL) null else integer(name)
-    private fun JSONObject.strings(name: String): List<String> {
+    private fun JSONObject.strings(name: String, limit: Int = 4): List<String> {
         val array = get(name)
-        require(array is JSONArray && array.length() <= 4) { "$name 必须是至多四项的字符串数组。" }
+        require(array is JSONArray && array.length() <= limit) { "$name 必须是至多 $limit 项的字符串数组。" }
         return (0 until array.length()).map { index ->
             val item = array.get(index); require(item is String) { "$name 必须为字符串。" }; item
         }

@@ -10,6 +10,26 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LedgerMigrationTest {
+    @Test fun migrationFromFivePreservesArchivesWithoutInventingHistory() {
+        val name = "migration-archive-test.db"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        try {
+            helper.createDatabase(name, 5).apply {
+                execSQL("INSERT INTO assets (id,name,kind,purchaseMinor,valueMinor,pricedAt,referencePricesMinor,note,createdAt,updatedAt,isDeleted,location,purchaseDate) VALUES ('30000000-0000-4000-8000-000000000001','camera','摄影',50000,20000,10,'','keep',10,20,0,'书房第二层','2026-01-01')")
+                close()
+            }
+            helper.runMigrationsAndValidate(name, 6, true).apply {
+                query("SELECT name,purchaseMinor,valueMinor,location,purchaseDate,tags,serialNumber,isFavorite,isValueKnown FROM assets").use {
+                    assertTrue(it.moveToFirst()); assertEquals("camera",it.getString(0)); assertEquals(50000L,it.getLong(1)); assertEquals(20000L,it.getLong(2))
+                    assertEquals("书房第二层",it.getString(3)); assertEquals("2026-01-01",it.getString(4)); assertEquals("[]",it.getString(5))
+                    assertTrue(it.isNull(6)); assertEquals(0,it.getInt(7)); assertEquals(1,it.getInt(8))
+                }
+                query("SELECT COUNT(*) FROM asset_records").use { assertTrue(it.moveToFirst()); assertEquals(0,it.getInt(0)) }
+                query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+                close()
+            }
+        } finally { context.deleteDatabase(name) }
+    }
     @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), LedgerDatabase::class.java)
 
     @Test fun migrationFromFourPreservesOldColumnsAndAddsLifeAndTransferFields() {

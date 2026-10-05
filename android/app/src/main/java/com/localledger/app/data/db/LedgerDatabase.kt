@@ -17,7 +17,7 @@ class LifeMigration : AutoMigrationSpec {
     }
 }
 
-@Database(entities = [CategoryEntity::class, AccountEntity::class, TransactionEntity::class, AssetEntity::class, MemoEntity::class, BudgetEntity::class, RecurringRuleEntity::class, WishEntity::class, LifeItemEntity::class, LifeCheckInEntity::class, FocusSessionEntity::class, StudyCardEntity::class, PaymentCandidateEntity::class], version = 5, exportSchema = true, autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5, spec = LifeMigration::class)])
+@Database(entities = [CategoryEntity::class, AccountEntity::class, TransactionEntity::class, AssetEntity::class, MemoEntity::class, BudgetEntity::class, RecurringRuleEntity::class, WishEntity::class, LifeItemEntity::class, LifeCheckInEntity::class, FocusSessionEntity::class, StudyCardEntity::class, PaymentCandidateEntity::class, AssetRecordEntity::class], version = 6, exportSchema = true, autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5, spec = LifeMigration::class), AutoMigration(from = 5, to = 6)])
 @TypeConverters(AssetConverters::class)
 abstract class LedgerDatabase : RoomDatabase() {
     abstract fun ledgerDao(): LedgerDao

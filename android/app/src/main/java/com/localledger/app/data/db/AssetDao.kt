@@ -8,6 +8,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AssetDao {
+    @Query("SELECT asset_records.* FROM asset_records JOIN assets ON assets.id = asset_records.assetId WHERE assets.isDeleted = 0 ORDER BY occurredAt DESC, createdAt DESC, asset_records.id")
+    fun observeRecords(): Flow<List<AssetRecordEntity>>
+    @Query("SELECT * FROM asset_records ORDER BY id") suspend fun allRecords(): List<AssetRecordEntity>
+    @Query("SELECT * FROM asset_records WHERE id = :id") suspend fun record(id: String): AssetRecordEntity?
+    @Upsert suspend fun saveRecord(record: AssetRecordEntity)
+    @Insert suspend fun insertRecords(records: List<AssetRecordEntity>)
+    @Query("DELETE FROM asset_records") suspend fun clearRecords()
     @Query("SELECT * FROM assets WHERE isDeleted = 1") fun deleted(): Flow<List<AssetEntity>>
     @Query("SELECT * FROM assets WHERE isDeleted = 0 ORDER BY valueMinor DESC, id")
     fun observeAssets(): Flow<List<AssetEntity>>

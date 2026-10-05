@@ -2,8 +2,6 @@ package com.localledger.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -140,17 +138,16 @@ fun LedgerApp(
         } else "note"
         val addingTask = route == "memos" && memoKind == "todo"
         val editing = route == "capture-entry" || route == "add" || route == "edit/{id}" || route == "copy/{id}" || route.startsWith("asset/") || route.startsWith("memo/") || route.startsWith("wish/")
-        val mainRoute = route in listOf("home", "memos", "wishes", "assets", "stats", "settings", "life")
+        val mainRoute = route in listOf("home", "memos", "wishes", "museum", "stats", "tools", "life")
         val snackbar = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
-        var menuOpen by remember { mutableStateOf(false) }
         var captureText by rememberSaveable { mutableStateOf("") }
         var entrySaving by remember { mutableStateOf(false) }
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = {
-                        if (mainRoute) SingleChoiceSegmentedButtonRow(Modifier.width(208.dp)) {
+                        if (mainRoute) SingleChoiceSegmentedButtonRow(Modifier.width(184.dp)) {
                             listOf(true to "备忘录", false to "记账").forEachIndexed { index, (mode, label) ->
                                 SegmentedButton(selected = memoMode == mode, onClick = { memoMode = mode },
                                     shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {},
@@ -165,6 +162,9 @@ fun LedgerApp(
                         "assets" -> "物品"
                         "asset/add" -> "添加物品"
                         "asset/edit/{id}" -> "编辑物品"
+                        "asset/view/{id}" -> "藏品档案"
+                        "asset/search" -> "全局找东西"
+                        "museum" -> "我的博物馆"
                         "stats" -> "报表分析"
                         "settings" -> "设置"
                         "life" -> "生活"
@@ -195,21 +195,11 @@ fun LedgerApp(
                     },
                     actions = {
                         if (!editing) {
-                            if (route == "wishes") IconButton(onClick = { navigation.navigate("wish/add") }) {
-                                Icon(painterResource(R.drawable.ic_ui_plus), "添加心愿")
+                            IconButton(onClick = { navigation.navigate("asset/search") }) {
+                                Icon(painterResource(R.drawable.ic_ui_search), "全局找东西")
                             }
-                            IconButton(onClick = { menuOpen = true }) { Icon(painterResource(R.drawable.ic_ui_more), "更多功能") }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(text = { Text("设置") }, onClick = { menuOpen = false; openMain("settings") })
-                                DropdownMenuItem(text = { Text(if (memoMode) "切换到记账" else "切换到备忘录") }, onClick = { menuOpen = false; memoMode = !memoMode })
-                                if (memoMode) DropdownMenuItem(text = { Text("待办事项") }, onClick = { menuOpen = false; navigation.navigate("tasks") })
-                                if (!memoMode) DropdownMenuItem(text = { Text("截图与自动采集") }, onClick = { menuOpen = false; navigation.navigate("capture") })
-                                if (!memoMode) DropdownMenuItem(text = { Text("账户管理") }, onClick = { menuOpen = false; navigation.navigate("accounts") })
-                                if (!memoMode) DropdownMenuItem(text = { Text("报销管理") }, onClick = { menuOpen = false; navigation.navigate("reimbursement") })
-                                if (!memoMode) DropdownMenuItem(text = { Text("预算与固定账目") }, onClick = { menuOpen = false; navigation.navigate("planning") })
-                                DropdownMenuItem(text = { Text("应用更新") }, onClick = { menuOpen = false; onUpdate() })
-                                DropdownMenuItem(text = { Text("导出完整备份") }, onClick = { menuOpen = false; onExport() })
-                                DropdownMenuItem(text = { Text("恢复完整备份") }, onClick = { menuOpen = false; onImport() })
+                            if (mainRoute) IconButton(onClick = { navigation.navigate("settings") }) {
+                                Icon(painterResource(R.drawable.ic_ui_settings), "设置")
                             }
                         }
                     },
@@ -218,8 +208,8 @@ fun LedgerApp(
             },
             bottomBar = {
                 if (mainRoute) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                    val pages = if (memoMode) listOf("memos" to "备忘录", "life" to "生活", "wishes" to "心愿", "settings" to "设置")
-                        else listOf("home" to "账单", "assets" to "物品", "stats" to "报表", "settings" to "设置")
+                    val pages = if (memoMode) listOf("memos" to "备忘录", "life" to "生活", "museum" to "博物馆", "wishes" to "心愿")
+                        else listOf("home" to "账单", "stats" to "报表", "museum" to "博物馆", "tools" to "工具")
                     pages.forEach { (destination, label) ->
                         NavigationBarItem(
                             selected = route == destination,
@@ -229,7 +219,7 @@ fun LedgerApp(
                                 "life" -> R.drawable.ic_ui_calendar
                                 "memos" -> R.drawable.ic_ui_notebook
                                 "wishes" -> R.drawable.ic_ui_heart
-                                "assets" -> R.drawable.ic_ui_package
+                                "museum" -> R.drawable.ic_ui_package
                                 "stats" -> R.drawable.ic_ui_report
                                 else -> R.drawable.ic_ui_settings
                             }), contentDescription = null) },
@@ -241,11 +231,11 @@ fun LedgerApp(
                 }
             },
             floatingActionButton = {
-                if (route in listOf("home", "assets", "memos")) ExtendedFloatingActionButton(
-                    modifier = Modifier.semantics { contentDescription = when(route) { "assets" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" } },
-                    onClick = { navigation.navigate(when(route) { "assets" -> "asset/add"; "memos" -> if (addingTask) "memo/task" else "memo/add"; else -> "add" }) },
+                if (route in listOf("home", "assets", "museum", "memos")) ExtendedFloatingActionButton(
+                    modifier = Modifier.semantics { contentDescription = when(route) { "assets", "museum" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" } },
+                    onClick = { navigation.navigate(when(route) { "assets", "museum" -> "asset/add"; "memos" -> if (addingTask) "memo/task" else "memo/add"; else -> "add" }) },
                     icon = { Icon(painterResource(R.drawable.ic_ui_plus), null) },
-                    text = { Text(when(route) { "assets" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" }) },
+                    text = { Text(when(route) { "assets", "museum" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" }) },
                     containerColor = if (route == "memos") Color(0xFFF3DF9A) else Color(0xFFF2A35A),
                     contentColor = Color(0xFF382A1C),
                 )
@@ -255,13 +245,14 @@ fun LedgerApp(
             modeStates.SaveableStateProvider(memoMode) {
                 NavHost(navigation, startDestination = startRoute, route = if (memoMode) "memo-mode" else "ledger-mode", modifier = Modifier.padding(padding)) {
                     if (!memoMode) {
+                        composable("tools") { LedgerToolsScreen { navigation.navigate(it) } }
                         composable("home") {
                             val model: HomeViewModel = viewModel(factory = remember(repository) {
                                 viewModelFactory { initializer { HomeViewModel(repository) } }
                             })
                             HomeScreen(model, snackbar, onEdit = { navigation.navigate("edit/$it") }, onCopy = { navigation.navigate("copy/$it") },
                                 onAccounts = { navigation.navigate("accounts") }, onAddTransaction = { navigation.navigate("add") }, onPlanning = { navigation.navigate("planning") },
-                                overview = { OverviewCards(repository, assetRepository, { navigation.navigate("accounts") }, { openMain("assets") }) })
+                                overview = { OverviewCards(repository, assetRepository, { navigation.navigate("accounts") }, { openMain("museum") }) })
                         }
                         composable("accounts") {
                             val model: AccountsViewModel = viewModel(factory = remember(repository) {
@@ -279,20 +270,7 @@ fun LedgerApp(
                             val model: AssetsViewModel = viewModel(factory = remember(assetRepository) {
                                 viewModelFactory { initializer { AssetsViewModel(assetRepository) } }
                             })
-                            AssetsScreen(model) { navigation.navigate("asset/edit/$it") }
-                        }
-                        composable("asset/add") {
-                            val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository) {
-                                viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), null) } }
-                            })
-                            AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
-                        }
-                        composable("asset/edit/{id}") { entry ->
-                            val id = requireNotNull(entry.arguments?.getString("id"))
-                            val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository, id) {
-                                viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), id) } }
-                            })
-                            AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                            AssetsScreen(model) { navigation.navigate("asset/view/$it") }
                         }
                         composable("stats") {
                             val model: StatsViewModel = viewModel(factory = remember(repository) {
@@ -307,15 +285,41 @@ fun LedgerApp(
                             CategoryScreen(model, snackbar)
                         }
                     }
+                    composable("asset/search") {
+                        val model: AssetsViewModel = viewModel(factory = remember(assetRepository) { viewModelFactory { initializer { AssetsViewModel(assetRepository) } } })
+                        AssetSearchScreen(model, { navigation.navigate("asset/view/$it") }, { navigation.navigate("museum") })
+                    }
+                    composable("museum") {
+                        val model: AssetsViewModel = viewModel(factory = remember(assetRepository) { viewModelFactory { initializer { AssetsViewModel(assetRepository) } } })
+                        AssetsScreen(model) { navigation.navigate("asset/view/$it") }
+                    }
+                    composable("asset/view/{id}") { entry ->
+                        val id = requireNotNull(entry.arguments?.getString("id"))
+                        val model: AssetDetailViewModel = viewModel(factory = remember(assetRepository, id) { viewModelFactory { initializer { AssetDetailViewModel(assetRepository, id) } } })
+                        AssetDetailScreen(model) { navigation.navigate("asset/edit/$it") }
+                    }
+                    composable("asset/add") {
+                        val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository) {
+                            viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), null) } }
+                        })
+                        AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                    }
+                    composable("asset/edit/{id}") { entry ->
+                        val id = requireNotNull(entry.arguments?.getString("id"))
+                        val model: AssetEditorViewModel = viewModel(factory = remember(assetRepository, id) {
+                            viewModelFactory { initializer { AssetEditorViewModel(assetRepository, createSavedStateHandle(), id) } }
+                        })
+                        AssetEditorScreen(model, { entrySaving = it }) { navigation.popBackStack() }
+                    }
                     composable("settings") {
                         val model: SettingsViewModel = viewModel(factory = remember(settingsRepository) {
                             viewModelFactory { initializer { SettingsViewModel(settingsRepository, versionName) } }
                         })
-                        SettingsScreen(model, memoMode = memoMode, onCategories = { navigation.navigate("category") }, onPlans = { navigation.navigate("planning") },
-                            onExport = onExport, onRestore = onImport, onImportCsv = { navigation.navigate("import") },
+                        SettingsScreen(model, memoMode = memoMode,
+                            onExport = onExport, onRestore = onImport,
                             onUpdate = onUpdate, onNotifications = onNotifications, onShortcut = onShortcut,
                             onRecycle = { navigation.navigate("recycle") },
-                            onCapture = { navigation.navigate("capture") }, onCaptureAccess = onCaptureAccess)
+                            onCaptureAccess = onCaptureAccess)
                     }
                     composable("recycle") { RecycleScreen(recycleRepository, memoMode) }
                     if (!memoMode) {
@@ -392,7 +396,7 @@ fun LedgerApp(
                             val model: LifeViewModel = viewModel(factory = remember(lifeRepository) {
                                 viewModelFactory { initializer { LifeViewModel(lifeRepository, createSavedStateHandle()) } }
                             })
-                            LifeScreen(model, onWishes = { openMain("wishes") }, onTasks = { navigation.navigate("tasks") })
+                            LifeScreen(model)
                         }
                         composable("tasks") {
                             val model: MemosViewModel = viewModel(factory = remember(memoRepository) {

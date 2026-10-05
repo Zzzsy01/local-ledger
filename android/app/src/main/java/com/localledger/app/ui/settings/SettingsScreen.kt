@@ -22,10 +22,9 @@ import com.localledger.app.R
 fun SettingsScreen(
     model: SettingsViewModel,
     memoMode: Boolean,
-    onCategories: () -> Unit, onPlans: () -> Unit, onExport: () -> Unit,
-    onRestore: () -> Unit, onImportCsv: () -> Unit, onUpdate: () -> Unit,
+    onExport: () -> Unit, onRestore: () -> Unit, onUpdate: () -> Unit,
     onNotifications: () -> Unit, onShortcut: (String) -> Unit,
-    onRecycle: () -> Unit = {}, onCapture: () -> Unit = {}, onCaptureAccess: () -> Unit = {},
+    onRecycle: () -> Unit = {}, onCaptureAccess: () -> Unit = {},
 ) {
     val settings by model.settings.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
@@ -70,37 +69,30 @@ fun SettingsScreen(
                 }
             }
             SettingsDivider()
-            SettingsToggle("隐藏金额", if (memoMode) "隐藏心愿清单的金额与进度" else "隐藏账单、身家和报表金额", settings.hideAmounts, model::hideAmounts)
+            SettingsToggle("隐藏金额", "隐藏账单、藏品估值、心愿金额与进度", settings.hideAmounts, model::hideAmounts)
         } }
         if (!memoMode) {
-        item { SectionTitle("记账与提醒") }
+        item { SectionTitle("支付通知采集") }
         item { SettingsCard {
             SettingsToggle("采集支付通知", "需授予通知使用权；仅微信/支付宝，候选核对后入账", settings.capturePayments, { enabled ->
                 model.capturePayments(enabled); if (enabled) onCaptureAccess()
             })
             SettingsLink("通知使用权", "开启采集后，前往系统授权或关闭权限", onCaptureAccess)
-            SettingsDivider()
-            SettingsLink("截图与自动采集", "离线识别截图，核对待入账通知", onCapture)
-            SettingsDivider()
-            SettingsLink("记账分类管理", "新增、排序、改名和停用分类", onCategories)
-            SettingsDivider()
-            SettingsLink("预算与固定账目", "月预算、订阅和定期收支", onPlans)
+
         } }
         }
-        item { SectionTitle("数据与备份") }
+        item { SectionTitle("提醒与隐私") }
         item { SettingsCard { SettingsToggle("到期提醒", "每天检查待办、重要日期、订阅、物品保修及固定账目；允许系统通知后生效", settings.dueReminders,
             { enabled -> if (model.dueReminders(enabled) && enabled) onNotifications() }) } }
         item { SettingsCard { SettingsToggle("应用锁", "使用手机锁屏密码；离开应用后锁定，并隐藏桌面待办内容", settings.appLock, model::appLock) } }
+        item { SectionTitle("数据与备份") }
         item { SettingsCard {
             SettingsLink("导出完整备份", if (memoMode) "保存备忘录、心愿及全部本机数据" else "保存账目、物品及全部本机数据", onExport)
             SettingsDivider()
             SettingsLink("恢复完整备份", "确认后替换当前全部数据", onRestore)
             SettingsDivider()
             SettingsLink("回收站", "恢复已删除的记录", onRecycle)
-            if (!memoMode) {
-                SettingsDivider()
-                SettingsLink("导入账单 CSV", "先预览，再确认导入", onImportCsv)
-            }
+
         } }
         item { SectionTitle("快捷入口") }
         item { SettingsCard {
@@ -123,8 +115,8 @@ fun SettingsScreen(
     information?.let { page -> AlertDialog(onDismissRequest = { information = null },
         title = { Text(if (page == "help") "使用帮助" else "随手账 ${model.versionName}") },
         text = { Text(if (page == "help") {
-            if (memoMode) "顶部可一键切换备忘录和记账，两种模式各自保留页面。\n\n备忘录支持搜索、置顶和完成待办；心愿清单填写预计价格和已攒金额，自动计算还差多少钱。攒钱是为目标预留的金额，买到后可标记达成。\n\n自动更新已默认开启，允许通知后可收到新版提醒。完整备份包含全部本机数据，恢复旧备份会清空其中未包含的心愿。"
-            else "顶部可一键切换记账和备忘录，两种模式各自保留页面。\n\n报表支持周、月、年和自定义日期；点击图表查看金额，点击排行账目可编辑。支持模板及微信/支付宝常见 CSV；退款、中性及关闭交易需手动核对。\n\n固定账目提醒需要系统通知权限，到期后由你确认入账。完整备份包含全部本机数据，恢复会替换当前数据。"
+            if (memoMode) "顶部可一键切换备忘录和记账，两种模式各自保留页面。\n\n生活按日常、计划、日期、学习和总结分组；博物馆保存物品位置与历史，顶部放大镜可跨模式找东西。\n\n备忘录支持搜索、置顶和完成待办；心愿清单填写预计价格和已攒金额，自动计算还差多少钱。攒钱是为目标预留的金额，买到后可标记达成。\n\n自动更新已默认开启，允许通知后可收到新版提醒。完整备份包含全部本机数据，恢复旧备份会清空其中未包含的新功能数据。"
+            else "顶部可一键切换记账和备忘录，两种模式各自保留页面。\n\n账户、预算、报销和账单采集统一在底栏「工具」。博物馆保存物品档案，顶部放大镜可找东西。\n\n报表支持周、月、年和自定义日期；点击图表查看金额，点击排行账目可编辑。支持模板及微信/支付宝常见 CSV；退款、中性及关闭交易需手动核对。\n\n固定账目提醒需要系统通知权限，到期后由你确认入账。完整备份包含全部本机数据，恢复会替换当前数据。"
         } else "数据保存在本机，无需账号。\n\n请定期导出完整备份，并将备份另存到手机以外的位置。\n\n应用可以自动检查新版，下载和安装由你确认。") },
         confirmButton = { TextButton(onClick = { information = null }) { Text("知道了") } }) }
     error?.let { AlertDialog(onDismissRequest = model::dismissError, title = { Text("设置未完成") }, text = { Text(it) },

@@ -69,4 +69,5 @@ data class LedgerSnapshot(
     val studyCards: List<StudyCard> = emptyList(),
     val assetPhotos: Map<String, String> = emptyMap(),
     val paymentCandidates: List<PaymentCandidate> = emptyList(),
+    val assetRecords: List<AssetRecord> = emptyList(),
 )

@@ -273,7 +273,7 @@ class MainActivity : ComponentActivity() {
                         if (!state.busy) AlertDialog(
                             onDismissRequest = host::cancelRestore,
                             title = { Text("恢复完整备份？") },
-                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.wishes.count { !it.isDeleted }} 个心愿、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目、${snapshot.lifeItems.count { !it.isDeleted }} 条生活记录、${snapshot.focusSessions.count { !it.isDeleted }} 次专注及 ${snapshot.studyCards.count { !it.isDeleted }} 张单词卡。恢复会替换当前全部数据；旧备份未包含的心愿及其他内容也会清空，建议先导出完整备份。") },
+                            text = { Text("备份包含 ${snapshot.transactions.count { !it.isDeleted }} 笔账目、${snapshot.assets.count { !it.isDeleted }} 件物品及 ${snapshot.assetRecords.size} 条物品历史、${snapshot.memos.count { !it.isDeleted }} 条备忘录、${snapshot.wishes.count { !it.isDeleted }} 个心愿、${snapshot.budgets.size} 个月预算、${snapshot.recurringRules.count { !it.isDeleted }} 个固定账目、${snapshot.lifeItems.count { !it.isDeleted }} 条生活记录、${snapshot.focusSessions.count { !it.isDeleted }} 次专注及 ${snapshot.studyCards.count { !it.isDeleted }} 张单词卡。恢复会替换当前全部数据；旧备份未包含的心愿及其他内容也会清空，建议先导出完整备份。") },
                             confirmButton = { TextButton(onClick = host::confirmRestore) { Text("替换并恢复") } },
                             dismissButton = { TextButton(onClick = host::cancelRestore) { Text("取消") } },
                         )

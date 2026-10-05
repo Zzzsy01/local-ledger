@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,13 +31,16 @@ internal val lifeOrange = Color(0xFFED9354)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) {
+fun LifeScreen(model: LifeViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     val query by model.search.collectAsStateWithLifecycle()
     val monthly by model.monthlySummary.collectAsStateWithLifecycle()
+    var section by rememberSaveable { mutableStateOf("日常") }
+    val listState = rememberLazyListState()
+    LaunchedEffect(section) { listState.scrollToItem(0) }
     var creating by rememberSaveable { mutableStateOf(false) }
     var editorKind by rememberSaveable { mutableStateOf<String?>(null) }
     var editorId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -58,7 +62,10 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
     val matched = state.items.filter { query.isBlank() || it.title.contains(query, true) || it.note.orEmpty().contains(query, true) || it.kind.label.contains(query) }
     val plans = matched.filter { it.kind in lifePlanKinds }
     val times = matched.filter { it.kind in lifeTimeKinds }.sortedBy { lifeEventDate(it, today) }
-    val records = matched.filter { it.kind !in lifePlanKinds && it.kind !in lifeTimeKinds }
+    val searching = query.isNotBlank()
+    fun show(group: String) = searching || section == group
+    val records = matched.filter { it.kind !in lifePlanKinds && it.kind !in lifeTimeKinds &&
+        (searching || if (section == "日期") it.kind == LifeKind.SUBSCRIPTION else it.kind != LifeKind.SUBSCRIPTION) }
     val habits = state.items.filter { it.kind == LifeKind.HABIT && it.dateEpochDay <= today.toEpochDay() }
     val checkedToday = state.checkIns.count { !it.isDeleted && it.dateEpochDay == today.toEpochDay() && habits.any { habit -> habit.id == it.itemId } }
     val focusedToday = state.focusSessions.filter { it.status == FocusStatus.COMPLETED && it.completedAt?.let { time -> Instant.ofEpochMilli(time).atZone(zone).toLocalDate() == today } == true }.sumOf { it.durationSeconds.toLong() } / 60
@@ -67,7 +74,7 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
     fun edit(item: LifeItem) { editorId = item.id; editorKind = item.kind.name; model.clearFeedback() }
     fun new(kind: LifeKind) { creating = false; editorId = null; editorKind = kind.name; model.clearFeedback() }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 108.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 108.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("生活", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -84,16 +91,24 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
             item {
                 OutlinedTextField(query, model::setSearch, Modifier.fillMaxWidth(), placeholder = { Text("搜索生活记录") },
                     singleLine = true, shape = RoundedCornerShape(18.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onWishes) { Text("购物 · 存钱计划") }
-                    TextButton(onClick = onTasks) { Text("待办事项") }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("日常", "计划", "日期", "学习", "总结").forEach { group ->
+                        FilterChip(section == group, { section = group; model.setSearch("") }, label = { Text(group) })
+                    }
                 }
+                Text(if (searching) "正在搜索所有生活分组" else when(section) {
+                    "日常" -> "习惯打卡、心情与日记"
+                    "计划" -> "旅行、课程与阅读进度"
+                    "日期" -> "重要日子、正倒计时与订阅续期"
+                    "学习" -> "番茄钟与单词复习"
+                    else -> "用本机真实记录回顾一周或一个月"
+                }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (state.loading) item { Loading() }
             state.error?.let { item { Message(it, true) } }
             message?.let { item { Message(it) } }
             if (editorKind == null && !focusEditor && !cardEditor) error?.let { item { Message(it, true) } }
-            item {
+            if (show("计划")) item {
                 LifeGroup("计划", "${plans.size} 个", plansOpen, { plansOpen = !plansOpen }) {
                     if (plans.isEmpty()) LifeEmpty("安排一次旅行、一个课程或一本书", onClick = { creating = true })
                     plans.forEachIndexed { index, item ->
@@ -112,8 +127,8 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                     }
                 }
             }
-            item {
-                LifeGroup("时间", "${times.size} 个事件", timesOpen, { timesOpen = !timesOpen }) {
+            if (show("日期")) item {
+                LifeGroup("重要日期", "${times.size} 个事件", timesOpen, { timesOpen = !timesOpen }) {
                     if (times.isEmpty()) LifeEmpty("生日、纪念日与重要日期", onClick = { creating = true })
                     times.forEachIndexed { index, item ->
                         LifeItemHeader(item, { edit(item) }, { deletingId = item.id }, busy) {
@@ -132,9 +147,9 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                     }
                 }
             }
-            item {
-                LifeGroup("记录", "${records.size} 个", recordsOpen, { recordsOpen = !recordsOpen }) {
-                    if (records.isEmpty()) LifeEmpty("打卡、心情、日记与订阅", onClick = { creating = true })
+            if (show("日常") || show("日期")) item {
+                LifeGroup(if (!searching && section == "日期") "订阅续期" else "日常记录", "${records.size} 个", recordsOpen, { recordsOpen = !recordsOpen }) {
+                    if (records.isEmpty()) LifeEmpty(if (section == "日期") "记录会员、服务等订阅的续期日期" else "从一个习惯或一篇日记开始", onClick = { creating = true })
                     records.forEachIndexed { index, item ->
                         LifeItemHeader(item, { edit(item) }, { deletingId = item.id }, busy) {
                             when (item.kind) {
@@ -169,7 +184,7 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                     }
                 }
             }
-            item {
+            if (show("学习")) item {
                 LifeGroup("专注", "番茄钟") {
                     if (activeFocus == null) {
                         LifeSmallText("选定一件事，专注 1 至 180 分钟")
@@ -203,7 +218,7 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                     if (focusHistory && completed.size > 50) LifeSmallText("显示最近 50 次，周/月总结包含全部已完成记录")
                 }
             }
-            item {
+            if (show("学习")) item {
                 LifeGroup("单词卡", "英语 · 日语") {
                     val mastered = state.cards.count { it.isMastered }
                     Text("已掌握 $mastered/${state.cards.size} · 待复习 ${dueCards.size}")
@@ -214,7 +229,7 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                         TextButton(onClick = { cardList = !cardList }) { Text(if (cardList) "收起单词" else "查看单词") }
                     }
                     LifeSmallText("按 1、3、7、14、30、60 天复习；忘记后次日重学。达到 30 天间隔计为已掌握。")
-                    if (cardList) state.cards.filter { query.isBlank() || it.word.contains(query, true) || it.meaning.contains(query, true) }.forEach { card ->
+                    if (cardList || searching) state.cards.filter { query.isBlank() || it.word.contains(query, true) || it.meaning.contains(query, true) }.forEach { card ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f).clickable { cardId = card.id; cardEditor = true; model.clearFeedback() }.padding(vertical = 8.dp)) {
                                 Text(card.word, fontWeight = FontWeight.SemiBold)
@@ -226,7 +241,7 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                     }
                 }
             }
-            item {
+            if (!searching && section == "总结") item {
                 val summary = lifeSummary(state.items, state.checkIns, state.focusSessions, state.cards, today, monthly)
                 LifeGroup(if (monthly) "月报" else "周报", "本地记录") {
                     Row {
@@ -244,11 +259,10 @@ fun LifeScreen(model: LifeViewModel, onWishes: () -> Unit, onTasks: () -> Unit) 
                 }
             }
         }
-        ExtendedFloatingActionButton(onClick = { model.clearFeedback(); creating = true },
-            Modifier.align(Alignment.BottomEnd).padding(20.dp), containerColor = lifeOrange, contentColor = Color(0xFF442B19)) { Text("＋ 新建") }
+        if (section != "总结") ExtendedFloatingActionButton(onClick = { model.clearFeedback(); creating = true },
+            Modifier.align(Alignment.BottomEnd).padding(20.dp), containerColor = lifeOrange, contentColor = Color(0xFF442B19)) { Text("＋ 新建${section}") }
     }
-    if (creating) LifeCreateDialog(onDismiss = { creating = false }, onSelect = ::new,
-        onWishes = { creating = false; onWishes() }, onTasks = { creating = false; onTasks() },
+    if (creating) LifeCreateDialog(section = section, onDismiss = { creating = false }, onSelect = ::new,
         onFocus = { creating = false; focusEditor = true }, onStudy = { creating = false; cardId = null; cardEditor = true })
     editorKind?.let { kind ->
         val existing = state.items.find { it.id == editorId }

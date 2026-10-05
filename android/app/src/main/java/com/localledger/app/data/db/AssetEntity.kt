@@ -29,6 +29,10 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "'持有中'") val status: String = "持有中",
     @ColumnInfo(defaultValue = "NULL") val disposedDate: String? = null,
     @ColumnInfo(defaultValue = "'[]'") val photoPaths: String = "[]",
+    @ColumnInfo(defaultValue = "'[]'") val tags: String = "[]",
+    @ColumnInfo(defaultValue = "NULL") val serialNumber: String? = null,
+    @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
+    @ColumnInfo(defaultValue = "1") val isValueKnown: Boolean = true,
 )
 
 class AssetConverters {
@@ -38,6 +42,7 @@ class AssetConverters {
 
 internal fun AssetEntity.toDomain() = Asset(id, name, kind, purchaseMinor, valueMinor, pricedAt, referencePricesMinor, note, createdAt, updatedAt, isDeleted,
     quantity, acquisition, purchaseDate, channel, location, warrantyUntil, status, disposedDate,
-    JSONArray(photoPaths).let { photos -> List(photos.length()) { photos.getString(it) } })
+    JSONArray(photoPaths).let { photos -> List(photos.length()) { photos.getString(it) } },
+    JSONArray(tags).let { values -> List(values.length()) { values.getString(it) } }, serialNumber, isFavorite, isValueKnown)
 internal fun Asset.toEntity() = AssetEntity(id, name, kind, purchaseMinor, valueMinor, pricedAt, referencePricesMinor, note, createdAt, updatedAt, isDeleted,
-    quantity, acquisition, purchaseDate, channel, location, warrantyUntil, status, disposedDate, JSONArray(photoPaths).toString())
+    quantity, acquisition, purchaseDate, channel, location, warrantyUntil, status, disposedDate, JSONArray(photoPaths).toString(), JSONArray(tags).toString(), serialNumber, isFavorite, isValueKnown)

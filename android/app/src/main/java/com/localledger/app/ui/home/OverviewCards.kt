@@ -32,8 +32,8 @@ fun OverviewCards(ledger: LedgerRepository, assets: AssetRepository, onAccounts:
         }
         Card(onClick = onAssets, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("拥有的物品", style = MaterialTheme.typography.titleSmall); Text("${held.heldQuantity} 件 · ${held.idleQuantity} 件闲置", style = MaterialTheme.typography.bodySmall) }
-                Text("¥${visibleAmount(held.heldValue)}", style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f)) { Text("我的博物馆", style = MaterialTheme.typography.titleSmall); Text("${held.heldQuantity} 件 · ${held.idleQuantity} 件闲置", style = MaterialTheme.typography.bodySmall) }
+                Column(Modifier.weight(1f)) { Text("已填估值", style = MaterialTheme.typography.labelSmall); Text("¥${visibleAmount(held.heldValue)}", style = MaterialTheme.typography.titleMedium) }
             }
         }
     }

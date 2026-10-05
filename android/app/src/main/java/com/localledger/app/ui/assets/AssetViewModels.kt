@@ -14,15 +14,21 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 val assetSorts = listOf("最近添加", "估值从高到低", "购入价从高到低", "日均成本从高到低", "名称")
-data class AssetFilters(val query: String = "", val status: String = "全部", val kind: String = "全部", val sort: String = "最近添加", val grid: Boolean = false)
+data class AssetFilters(val query: String = "", val status: String = "全部", val kind: String = "全部", val sort: String = "最近添加", val grid: Boolean = false,
+    val location: String = "全部位置", val collection: String = "全部藏品")
 data class AssetsState(val items: List<Asset> = emptyList(), val loading: Boolean = true, val error: String? = null,
-    val summary: AssetSummary = AssetSummary(), val total: Int = 0, val kinds: List<String> = assetKinds, val filters: AssetFilters = AssetFilters())
+    val summary: AssetSummary = AssetSummary(), val total: Int = 0, val kinds: List<String> = assetKinds, val filters: AssetFilters = AssetFilters(),
+    val locations: List<String> = emptyList(), val favoriteCount: Int = 0, val needsOrganizingCount: Int = 0,
+    val historyMatches: Set<String> = emptySet())
 class AssetsViewModel(private val repository: AssetRepository) : ViewModel() {
     private val filters = MutableStateFlow(AssetFilters())
-    val state = combine(repository.assets, filters) { assets, filter ->
+    val state = combine(repository.assets, repository.records, filters) { assets, records, filter ->
+        val history = records.groupBy { it.assetId }
         val matching = assets.filter { asset ->
             (filter.status == "全部" || asset.status == filter.status) && (filter.kind == "全部" || asset.kind == filter.kind) &&
-                (filter.query.isBlank() || listOf(asset.name, asset.kind, asset.note.orEmpty(), asset.location.orEmpty(), asset.channel.orEmpty()).any { it.contains(filter.query.trim(), ignoreCase = true) })
+                (filter.location == "全部位置" || asset.location == filter.location || (filter.location == "未填位置" && asset.location.isNullOrBlank())) &&
+                (filter.collection != "收藏展柜" || asset.isFavorite) && (filter.collection != "待整理" || asset.needsOrganizing) &&
+                assetMatches(asset, filter.query, history[asset.id].orEmpty())
         }
         val sorted = when (filter.sort) {
             "估值从高到低" -> matching.sortedByDescending { it.valueMinor }
@@ -31,7 +37,9 @@ class AssetsViewModel(private val repository: AssetRepository) : ViewModel() {
             "名称" -> matching.sortedBy { it.name }
             else -> matching.sortedByDescending { it.createdAt }
         }
-        AssetsState(sorted, false, summary = summarizeAssets(assets), total = assets.size, kinds = (assetKinds + assets.map { it.kind }).distinct(), filters = filter)
+        AssetsState(sorted, false, summary = summarizeAssets(assets), total = assets.size, kinds = (assetKinds + assets.map { it.kind }).distinct(), filters = filter,
+            locations = assets.mapNotNull { it.location }.distinct().sorted(), favoriteCount = assets.count { it.isFavorite }, needsOrganizingCount = assets.count { it.needsOrganizing },
+            historyMatches = matching.filterNot { assetMatches(it, filter.query) }.map { it.id }.toSet())
     }
         .catch { emit(AssetsState(loading = false, error = it.displayMessage())) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AssetsState())
@@ -52,6 +60,7 @@ data class AssetDraft(
     val quantity: Int = 1, val acquisition: String = "购买", val purchaseDate: String = "", val channel: String = "",
     val location: String = "", val warrantyUntil: String = "", val status: String = "持有中", val disposedDate: String = "",
     val photoPaths: List<String> = emptyList(), val importing: Boolean = false,
+    val tags: String = "", val serialNumber: String = "", val isFavorite: Boolean = false,
 )
 class AssetEditorViewModel(private val repository: AssetRepository, private val savedState: SavedStateHandle, private val id: String?) : ViewModel() {
     private val mutableDraft = MutableStateFlow(AssetDraft(
@@ -64,17 +73,19 @@ class AssetEditorViewModel(private val repository: AssetRepository, private val 
         purchaseDate = savedState["purchaseDate"] ?: "", channel = savedState["channel"] ?: "", location = savedState["location"] ?: "",
         warrantyUntil = savedState["warrantyUntil"] ?: "", status = savedState["status"] ?: "持有中", disposedDate = savedState["disposedDate"] ?: "",
         photoPaths = savedState.get<ArrayList<String>>("photoPaths")?.toList() ?: emptyList(),
+        tags = savedState["tags"] ?: "", serialNumber = savedState["serialNumber"] ?: "", isFavorite = savedState["isFavorite"] ?: false,
     ))
     val draft = mutableDraft.asStateFlow()
     init { if (mutableDraft.value.loading) viewModelScope.launch {
         try {
             val asset = requireNotNull(repository.asset(id!!)) { "物品已不存在。" }
             change { it.copy(name = asset.name, kind = asset.kind, purchase = asset.purchaseMinor?.let(::formatAmount).orEmpty(),
-                value = formatAmount(asset.valueMinor), prices = asset.referencePricesMinor.joinToString(", ", transform = ::formatAmount),
+                value = if (asset.isValueKnown) formatAmount(asset.valueMinor) else "", prices = asset.referencePricesMinor.joinToString(", ", transform = ::formatAmount),
                 note = asset.note.orEmpty(), date = Instant.ofEpochMilli(asset.pricedAt).atZone(ZoneId.systemDefault()).toLocalDate(), loading = false,
                 quantity = asset.quantity, acquisition = asset.acquisition, purchaseDate = asset.purchaseDate.orEmpty(),
                 channel = asset.channel.orEmpty(), location = asset.location.orEmpty(), warrantyUntil = asset.warrantyUntil.orEmpty(),
-                status = asset.status, disposedDate = asset.disposedDate.orEmpty(), photoPaths = asset.photoPaths) }
+                status = asset.status, disposedDate = asset.disposedDate.orEmpty(), photoPaths = asset.photoPaths,
+                tags = asset.tags.joinToString(" "), serialNumber = asset.serialNumber.orEmpty(), isFavorite = asset.isFavorite) }
             savedState["loaded"] = true
         } catch (error: Exception) { mutableDraft.update { it.copy(loading = false, error = error.displayMessage()) } }
     } }
@@ -87,6 +98,7 @@ class AssetEditorViewModel(private val repository: AssetRepository, private val 
         savedState["quantity"] = d.quantity; savedState["acquisition"] = d.acquisition; savedState["purchaseDate"] = d.purchaseDate
         savedState["channel"] = d.channel; savedState["location"] = d.location; savedState["warrantyUntil"] = d.warrantyUntil
         savedState["status"] = d.status; savedState["disposedDate"] = d.disposedDate; savedState["photoPaths"] = ArrayList(d.photoPaths)
+        savedState["tags"] = d.tags; savedState["serialNumber"] = d.serialNumber; savedState["isFavorite"] = d.isFavorite
     }
     fun photoFile(path: String) = repository.photoFile(path)
     fun importPhotos(uris: List<Uri>) {
@@ -112,11 +124,13 @@ class AssetEditorViewModel(private val repository: AssetRepository, private val 
         viewModelScope.launch {
             try {
                 val references = parseReferencePrices(d.prices)
-                val value = if (references.isNotEmpty()) averagePrice(references) else requireNotNull(parseAmount(d.value, allowZero = true)) { "请填写当前估值，可填 0。" }
+                val known = references.isNotEmpty() || d.value.isNotBlank()
+                val value = if (references.isNotEmpty()) averagePrice(references) else if (!known) 0L else requireNotNull(parseAmount(d.value, allowZero = true)) { "估值格式不正确，可填 0 或留空。" }
                 val purchase = if (d.purchase.isBlank()) null else requireNotNull(parseAmount(d.purchase, allowZero = true)) { "购入价格式不正确。" }
                 repository.save(id, d.name, d.kind, purchase, value, d.date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(), references, d.note,
                     d.quantity, d.acquisition, d.purchaseDate.takeIf { it.isNotBlank() }, d.channel, d.location,
-                    d.warrantyUntil.takeIf { it.isNotBlank() }, d.status, d.disposedDate.takeIf { it.isNotBlank() }, d.photoPaths)
+                    d.warrantyUntil.takeIf { it.isNotBlank() }, d.status, d.disposedDate.takeIf { it.isNotBlank() }, d.photoPaths,
+                    parseAssetTags(d.tags), d.serialNumber, d.isFavorite, known)
                 mutableDraft.update { it.copy(saving = false, saved = true) }
             } catch (error: Exception) { mutableDraft.update { it.copy(saving = false, error = error.displayMessage()) } }
         }

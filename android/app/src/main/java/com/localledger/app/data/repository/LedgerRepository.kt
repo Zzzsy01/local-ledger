@@ -213,6 +213,7 @@ class LedgerRepository(
             db.lifeDao().allFocusSessions().map { it.toDomain() },
             db.lifeDao().allStudyCards().map { it.toDomain() },
             paymentCandidates = db.paymentCandidateDao().all().map { it.toDomain() },
+            assetRecords = db.assetDao().allRecords().map { it.toDomain() },
         )
     })
 
@@ -228,6 +229,7 @@ class LedgerRepository(
             db.planningDao().clearRules()
             db.planningDao().clearBudgets()
             db.memoDao().clear()
+            db.assetDao().clearRecords()
             db.assetDao().clear()
             dao.clearTransactions()
             dao.clearCategories()
@@ -236,6 +238,7 @@ class LedgerRepository(
             dao.insertAccounts(snapshot.accounts.map { it.toEntity() })
             dao.insertTransactions(snapshot.transactions.map { it.toEntity() })
             db.assetDao().insertAll(restored.assets.map { it.toEntity() })
+            db.assetDao().insertRecords(snapshot.assetRecords.map { it.toEntity() })
             db.memoDao().insertAll(snapshot.memos.map { it.toEntity() })
             db.planningDao().insertBudgets(snapshot.budgets.map { it.toEntity() })
             db.planningDao().insertRules(snapshot.recurringRules.map { it.toEntity() })

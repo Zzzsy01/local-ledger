@@ -25,6 +25,10 @@ data class Asset(
     val status: String = "持有中",
     val disposedDate: String? = null,
     val photoPaths: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val serialNumber: String? = null,
+    val isFavorite: Boolean = false,
+    val isValueKnown: Boolean = true,
 )
 
 val assetKinds = listOf("数码", "摄影", "家电", "家具", "运动", "饰品", "交通", "工具", "玩具", "宠物", "服饰", "图书", "美妆", "食品", "其他")
@@ -73,6 +77,9 @@ fun parseReferencePrices(text: String): List<Long> = if (text.isBlank()) emptyLi
     }.also { require(it.size <= 30) { "最多填写 30 个参考报价。" } }
 
 fun validateAsset(asset: Asset) {
+    require(asset.isValueKnown || (asset.valueMinor == 0L && asset.referencePricesMinor.isEmpty())) { "未估值物品不能包含估值金额或报价。" }
+    require(asset.tags.size <= 12 && asset.tags.distinct().size == asset.tags.size && asset.tags.all { it.isNotBlank() && it.length <= 30 }) { "最多 12 个标签，每个不超过 30 字。" }
+    require(asset.serialNumber == null || asset.serialNumber.length <= 120) { "编号不能超过 120 字。" }
     require(asset.name.isNotBlank() && asset.kind.isNotBlank()) { "请填写物品名称与类别。" }
     require(asset.valueMinor >= 0 && (asset.purchaseMinor == null || asset.purchaseMinor >= 0)) { "物品金额不能为负数。" }
     require(asset.pricedAt >= 0 && asset.createdAt >= 0 && asset.updatedAt >= asset.createdAt) { "物品日期无效。" }
@@ -91,3 +98,35 @@ fun validateAsset(asset: Asset) {
         require(asset.valueMinor == averagePrice(asset.referencePricesMinor)) { "物品估值与参考报价均值不一致。" }
     }
 }
+
+fun parseAssetTags(text: String): List<String> = text.split(Regex("[,，#\\s]+")).filter { it.isNotBlank() }.distinct()
+
+data class AssetRecord(
+    val id: String, val assetId: String, val kind: String, val occurredAt: Long,
+    val content: String, val fromLocation: String? = null, val toLocation: String? = null,
+    val amountMinor: Long? = null, val previousAmountMinor: Long? = null,
+    val createdAt: Long, val updatedAt: Long,
+)
+val manualAssetRecordKinds = listOf("随记", "使用", "保养", "借还")
+val assetRecordKinds = listOf("建立档案", "位置变更", "估值更新", "购入信息", "状态变更", "档案更新") + manualAssetRecordKinds
+fun validateAssetRecord(record: AssetRecord) {
+    require(record.kind in assetRecordKinds && record.content.isNotBlank()) { "物品记录类型或内容无效。" }
+    require(record.occurredAt >= 0 && record.createdAt >= 0 && record.updatedAt >= record.createdAt) { "物品记录日期无效。" }
+    require(record.amountMinor == null || record.amountMinor >= 0) { "记录金额不能为负数。" }
+    require(record.previousAmountMinor == null || record.previousAmountMinor >= 0) { "原金额不能为负数。" }
+    require(record.kind in listOf("建立档案", "估值更新", "购入信息") || (record.amountMinor == null && record.previousAmountMinor == null)) { "此记录类型不支持金额。" }
+    require(record.kind == "位置变更" || (record.fromLocation == null && record.toLocation == null)) { "此记录类型不支持位置变化。" }
+    require(record.kind != "估值更新" || record.amountMinor != null || record.previousAmountMinor != null) { "估值记录缺少金额。" }
+}
+
+private fun searchText(value: String) = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT)
+fun assetMatches(asset: Asset, query: String, records: List<AssetRecord> = emptyList()): Boolean {
+    val terms = searchText(query).trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    val fields = listOf(asset.name, asset.kind, asset.note.orEmpty(), asset.location.orEmpty(), asset.channel.orEmpty(),
+        asset.serialNumber.orEmpty(), asset.tags.joinToString(" "), asset.purchaseDate.orEmpty(), asset.status) +
+        records.filter { it.assetId == asset.id }.flatMap { listOf(it.content, it.fromLocation.orEmpty(), it.toLocation.orEmpty()) }
+    val searchable = searchText(fields.joinToString("\n"))
+    return terms.all { it in searchable }
+}
+
+val Asset.needsOrganizing: Boolean get() = location.isNullOrBlank() || purchaseDate == null || purchaseMinor == null

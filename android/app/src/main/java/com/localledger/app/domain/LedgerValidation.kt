@@ -57,6 +57,12 @@ fun accountBalances(accounts: List<Account>, transactions: List<Transaction>): L
 }
 
 fun validateSnapshot(snapshot: LedgerSnapshot) {
+    validateIds(snapshot.assetRecords.map { it.id })
+    val assetIds = snapshot.assets.map { it.id }.toSet()
+    snapshot.assetRecords.forEach {
+        validateAssetRecord(it)
+        require(it.assetId in assetIds) { "物品记录引用的档案不存在。" }
+    }
     validateIds(snapshot.paymentCandidates.map { it.id })
     snapshot.paymentCandidates.forEach {
         require(it.source in listOf("微信", "支付宝") && it.text.isNotBlank() && it.text.length <= 32_000 && it.capturedAt >= 0) { "支付候选记录无效。" }

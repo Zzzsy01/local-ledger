@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -51,23 +53,40 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun AssetsScreen(model: AssetsViewModel, onEdit: (String) -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
     var deleting by remember { mutableStateOf<Asset?>(null) }
+    val stackSummary = LocalConfiguration.current.screenWidthDp < 360 || LocalDensity.current.fontScale > 1.2f
     LazyVerticalGrid(GridCells.Fixed(if (state.filters.grid) 2 else 1), Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 104.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryCard("持有估值", "¥${visibleAmount(state.summary.heldValue)}", "${state.summary.heldQuantity} 件 · 含闲置物品", Modifier.weight(1f), Color(0xFFE7F0E8))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("我的博物馆", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("每件物品都有位置，也有故事。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("全部藏品" to state.total, "收藏展柜" to state.favoriteCount, "待整理" to state.needsOrganizingCount).forEach { (label, count) ->
+                        FilterChip(state.filters.collection == label, { model.filter { it.copy(collection = label) } }, label = { Text("$label $count") })
+                    }
+                }
+                if (state.filters.collection == "待整理") Text("补齐位置、购入日期或买价，下次就更容易找到。", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            FlowRow(maxItemsInEachRow = if (stackSummary) 1 else 2, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SummaryCard("已填估值合计", "¥${visibleAmount(state.summary.heldValue)}", "持有 ${state.summary.heldQuantity} 件 · 含闲置", Modifier.weight(1f), Color(0xFFE7F0E8))
                 SummaryCard("闲置中", "${state.summary.idleQuantity} 件", "已清出 ${state.summary.clearedQuantity} 件", Modifier.weight(1f), Color(0xFFFFF0E3))
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             OutlinedTextField(state.filters.query, { query -> model.filter { it.copy(query = query) } }, Modifier.fillMaxWidth(),
-                placeholder = { Text("搜索物品、类别或存放位置") }, singleLine = true, shape = RoundedCornerShape(18.dp),
+                placeholder = { Text("搜索名称、位置、标签、编号或历史") }, singleLine = true, shape = RoundedCornerShape(18.dp),
                 leadingIcon = { Icon(painterResource(R.drawable.ic_ui_search), null, Modifier.size(20.dp)) })
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            AssetFilterMenu(state.filters.location, (listOf("全部位置", "未填位置") + state.locations).distinct(), Modifier.fillMaxWidth()) { location -> model.filter { it.copy(location = location) } }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -85,7 +104,7 @@ fun AssetsScreen(model: AssetsViewModel, onEdit: (String) -> Unit) {
         if (!state.loading && state.items.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Message(if (state.total == 0) "记录你拥有的东西\n添加物品后，可以查看持有估值与日均成本。" else "没有符合条件的物品。")
         }
-        items(state.items, key = { it.id }) { asset -> AssetCard(asset, state.filters.grid, asset.photoPaths.firstOrNull()?.let(model::photoFile), { onEdit(asset.id) }, { deleting = asset }) }
+        items(state.items, key = { it.id }) { asset -> AssetCard(asset, state.filters.grid, asset.photoPaths.firstOrNull()?.let(model::photoFile), asset.id in state.historyMatches, { onEdit(asset.id) }, { deleting = asset }) }
     }
     deleting?.let { asset -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("移除「${asset.name}」？") }, text = { Text("这条物品记录将被移除。若要保留使用历史，请编辑为已出、丢失或退役状态。") },
         confirmButton = { TextButton(onClick = { model.delete(asset.id); deleting = null }) { Text("移除") } }, dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } }) }
@@ -114,7 +133,7 @@ private fun AssetFilterMenu(label: String, options: List<String>, modifier: Modi
 }
 
 @Composable
-private fun AssetCard(asset: Asset, grid: Boolean, file: File?, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun AssetCard(asset: Asset, grid: Boolean, file: File?, historyMatch: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     val today = LocalDate.now()
     val days = assetHoldingDays(asset, today)
@@ -129,11 +148,15 @@ private fun AssetCard(asset: Asset, grid: Boolean, file: File?, onEdit: () -> Un
                     Text("${asset.quantity} 件 · ${asset.status}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
+            Text("现在：${asset.location ?: "未填写位置"}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (historyMatch) Text("匹配到历史记录 · 上方为当前位置", style = MaterialTheme.typography.labelSmall)
+            if (asset.isFavorite) Text("★ 收藏展柜", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+            if (asset.tags.isNotEmpty()) Text(asset.tags.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(daily?.let { "日均 ¥${visibleAmount(it)} · ${days} 天" } ?: if (asset.purchaseDate == null) "补充购入日期后计算日均成本" else "未填写购入成本", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary, maxLines = 2)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("当前估值", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("¥${visibleAmount(asset.valueMinor)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (asset.isValueKnown) "¥${visibleAmount(asset.valueMinor)}" else "未估值", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) { Icon(painterResource(R.drawable.ic_ui_more), "${asset.name}物品操作", Modifier.size(18.dp)) }
@@ -142,14 +165,13 @@ private fun AssetCard(asset: Asset, grid: Boolean, file: File?, onEdit: () -> Un
             }
             Text(asset.purchaseMinor?.let { "购入成本 ¥${visibleAmount(it)}" } ?: "未填写购入成本", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             asset.purchaseDate?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            asset.location?.let { Text("存放：$it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             asset.warrantyUntil?.let { Text(if (LocalDate.parse(it) >= today) "保修至 $it" else "保修已到期", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
 
 @Composable
-private fun AssetPhoto(file: File?, modifier: Modifier, description: String) {
+internal fun AssetPhoto(file: File?, modifier: Modifier, description: String, scale: ContentScale = ContentScale.Crop) {
     val bitmap by produceState<ImageBitmap?>(null, file?.absolutePath) {
         value = file?.let { imageFile -> withContext(Dispatchers.IO) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -159,7 +181,7 @@ private fun AssetPhoto(file: File?, modifier: Modifier, description: String) {
         } }
     }
     Box(modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-        bitmap?.let { Image(it, description, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        bitmap?.let { Image(it, description, Modifier.fillMaxSize(), contentScale = scale) }
             ?: Icon(painterResource(R.drawable.ic_ui_package), description, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -180,6 +202,11 @@ fun AssetEditorScreen(model: AssetEditorViewModel, onSavingChanged: (Boolean) ->
     Column(Modifier.fillMaxSize().imePadding()) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
             if (draft.loading) item { Loading() }
+            item { EditorSection("先记下它在哪里") {
+                OutlinedTextField(draft.name, { value -> model.change { it.copy(name = value) } }, Modifier.fillMaxWidth(), label = { Text("物品名称／型号") }, enabled = enabled, singleLine = true)
+                OutlinedTextField(draft.location, { value -> model.change { it.copy(location = value) } }, Modifier.fillMaxWidth(), label = { Text("存放位置 / 当前保管人（选填）") }, placeholder = { Text("家 / 书房 / 白色柜子 / 第二层") }, enabled = enabled, minLines = 2)
+                Text("先填名称和位置即可保存，其他资料可以慢慢补全。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } }
             item { EditorSection("物品图片 · ${draft.photoPaths.size}/4") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     draft.photoPaths.forEachIndexed { index, path -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -190,8 +217,10 @@ fun AssetEditorScreen(model: AssetEditorViewModel, onSavingChanged: (Boolean) ->
                 }
                 Text(if (draft.importing) "正在保存照片…" else "第一张作为封面，照片保存在本机，最多 4 张。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } }
-            item { EditorSection("基本信息") {
-                OutlinedTextField(draft.name, { value -> model.change { it.copy(name = value) } }, Modifier.fillMaxWidth(), label = { Text("物品名称／型号") }, enabled = enabled, singleLine = true)
+            item { EditorSection("分类与收藏") {
+                OutlinedTextField(draft.tags, { value -> model.change { it.copy(tags = value) } }, Modifier.fillMaxWidth(), label = { Text("标签 / 别名（空格或逗号分隔）") }, placeholder = { Text("旅行 随身 耳机") }, enabled = enabled)
+                OutlinedTextField(draft.serialNumber, { value -> model.change { it.copy(serialNumber = value) } }, Modifier.fillMaxWidth(), label = { Text("序列号 / 自定义编号（选填）") }, enabled = enabled, singleLine = true)
+                Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(draft.isFavorite, { value -> model.change { it.copy(isFavorite = value) } }, enabled = enabled); Text("放进我的收藏展柜") }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { (assetKinds + draft.kind).distinct().forEach { kind -> FilterChip(draft.kind == kind, { model.change { it.copy(kind = kind) } }, label = { Text(kind) }, enabled = enabled) } }
                 OutlinedTextField(draft.kind, { value -> model.change { it.copy(kind = value) } }, Modifier.fillMaxWidth(), label = { Text("类别（可自定义）") }, singleLine = true, enabled = enabled)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -207,9 +236,7 @@ fun AssetEditorScreen(model: AssetEditorViewModel, onSavingChanged: (Boolean) ->
                 AssetDateField("购入日期", draft.purchaseDate, enabled, { value -> model.change { it.copy(purchaseDate = value) } })
                 OutlinedTextField(draft.channel, { value -> model.change { it.copy(channel = value) } }, Modifier.fillMaxWidth(), label = { Text("获取渠道（选填）") }, placeholder = { Text("如：京东、淘宝、线下门店") }, enabled = enabled, singleLine = true)
             } }
-            item { EditorSection("位置与保修") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("卧室", "客厅", "书房", "厨房", "办公室").forEach { location -> FilterChip(draft.location == location, { model.change { it.copy(location = location) } }, label = { Text(location) }, enabled = enabled) } }
-                OutlinedTextField(draft.location, { value -> model.change { it.copy(location = value) } }, Modifier.fillMaxWidth(), label = { Text("存放位置（选填）") }, enabled = enabled, singleLine = true)
+            item { EditorSection("保修信息") {
                 AssetDateField("保修到期", draft.warrantyUntil, enabled, { value -> model.change { it.copy(warrantyUntil = value) } })
                 Text("日均成本按购入总成本 ÷ 持有自然日计算，购入当天计 1 天。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } }
@@ -232,10 +259,10 @@ fun AssetEditorScreen(model: AssetEditorViewModel, onSavingChanged: (Boolean) ->
                 }
                 OutlinedTextField(draft.prices, { value -> model.change { it.copy(prices = value, date = LocalDate.now()) } }, Modifier.fillMaxWidth(), label = { Text("参考报价（元，选填）") }, placeholder = { Text("例如 2300, 2500, 2400") }, supportingText = { Text("手动录入同配置、同成色的报价，用逗号分隔。排除配件、定金和故障机；挂牌价不等于成交价。") }, enabled = enabled, minLines = 2)
                 OutlinedTextField(if (draft.prices.isBlank()) draft.value else mean?.let(::formatAmount).orEmpty(), { value -> model.change { it.copy(value = value, date = LocalDate.now()) } }, Modifier.fillMaxWidth(), label = { Text(if (draft.prices.isBlank()) "当前二手估值" else "参考报价均值") }, prefix = { Text("¥") },
-                    supportingText = { Text(if (draft.prices.isBlank()) "这一条记录当前的总估值，无残值时填 0。" else if (mean == null) "请检查参考报价格式" else "根据参考报价计算总估值，购入成本单独保留。") }, isError = draft.prices.isNotBlank() && mean == null, enabled = enabled, readOnly = draft.prices.isNotBlank(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
+                    supportingText = { Text(if (draft.prices.isBlank()) "不知道可留空，确认无残值时填 0；这是本条记录总估值。" else if (mean == null) "请检查参考报价格式" else "根据参考报价计算总估值，购入成本单独保留。") }, isError = draft.prices.isNotBlank() && mean == null, enabled = enabled, readOnly = draft.prices.isNotBlank(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
                 AssetDateField("估值日期", draft.date.toString(), enabled, { value -> model.change { it.copy(date = LocalDate.parse(value)) } }, allowClear = false)
             } }
-            item { EditorSection("备注") { OutlinedTextField(draft.note, { value -> model.change { it.copy(note = value) } }, Modifier.fillMaxWidth(), label = { Text("成色、配置、参考链接（选填）") }, enabled = enabled, minLines = 2, maxLines = 4) } }
+            item { EditorSection("物品的故事") { OutlinedTextField(draft.note, { value -> model.change { it.copy(note = value) } }, Modifier.fillMaxWidth(), label = { Text("来历、回忆、成色、配置或参考链接") }, enabled = enabled, minLines = 3, maxLines = 8) } }
         }
         draft.error?.let { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.error) }
         Button(onClick = model::save, enabled = enabled && !draft.saved, modifier = Modifier.fillMaxWidth().padding(20.dp).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF29A50), contentColor = Color(0xFF33200F)), shape = RoundedCornerShape(16.dp)) { Text(if (busy) "保存中…" else "保存物品") }
@@ -243,14 +270,14 @@ fun AssetEditorScreen(model: AssetEditorViewModel, onSavingChanged: (Boolean) ->
 }
 
 @Composable
-private fun EditorSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun EditorSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold); content() }
     }
 }
 
 @Composable
-private fun AssetDateField(label: String, value: String, enabled: Boolean, onChange: (String) -> Unit, allowClear: Boolean = true) {
+internal fun AssetDateField(label: String, value: String, enabled: Boolean, onChange: (String) -> Unit, allowClear: Boolean = true) {
     val context = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(onClick = {
