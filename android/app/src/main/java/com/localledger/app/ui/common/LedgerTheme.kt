@@ -19,7 +19,7 @@ val LocalAccent = staticCompositionLocalOf { "blue" }
 
 private val ledgerTypography = Typography().run { copy(
     headlineLarge = headlineLarge.copy(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp),
-    headlineMedium = headlineMedium.copy(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = headlineMedium.copy(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.7).sp),
     headlineSmall = headlineSmall.copy(fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold),
     titleLarge = titleLarge.copy(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = titleMedium.copy(fontSize = 17.sp, lineHeight = 25.sp, letterSpacing = 0.sp),
@@ -39,23 +39,29 @@ fun LedgerTheme(darkTheme: Boolean = isSystemInDarkTheme(), accent: String = "bl
         primaryContainer = Color(0xFF145145), onPrimaryContainer = Color(0xFFB8EEDD),
         secondary = Color(0xFFA4C8EE), onSecondary = Color(0xFF123C60),
         secondaryContainer = Color(0xFF254E44), onSecondaryContainer = Color(0xFFB8EEDD),
-        tertiary = Color(0xFFE3B489),
+        tertiary = Color(0xFFE9B38B), onTertiary = Color(0xFF482A18),
+        tertiaryContainer = Color(0xFFFFB86C), onTertiaryContainer = Color(0xFF4A2B15),
         background = Color(0xFF101A17), surface = Color(0xFF17231F),
         surfaceVariant = Color(0xFF2A3B34), surfaceContainerHigh = Color(0xFF203129),
         surfaceContainerHighest = Color(0xFF2A3B34),
-        onSurface = Color(0xFFE1EBE5), onSurfaceVariant = Color(0xFFB6C9BF), outlineVariant = Color(0xFF354840),
+        onSurface = Color(0xFFE1EBE5), onSurfaceVariant = Color(0xFFB6C9BF), outline = Color(0xFF71877B), outlineVariant = Color(0xFF354840),
     ) else lightColorScheme(
         primary = Color(0xFF267666), onPrimary = Color.White,
         primaryContainer = Color(0xFFD8EDE6), onPrimaryContainer = Color(0xFF123C32),
         secondary = Color(0xFF365D83), onSecondary = Color.White,
         secondaryContainer = Color(0xFFE1EDE8), onSecondaryContainer = Color(0xFF194D40),
-        tertiary = Color(0xFF986442), background = Color(0xFFF4F6F5),
+        tertiary = Color(0xFF995C3B), onTertiary = Color.White, background = Color(0xFFF2F5F1),
+        tertiaryContainer = Color(0xFFFFB86C), onTertiaryContainer = Color(0xFF4A2B15),
         surface = Color.White, surfaceVariant = Color(0xFFE8EEEB),
         surfaceContainerHigh = Color(0xFFECF2EF), surfaceContainerHighest = Color(0xFFE3EBE7),
         onSurface = Color(0xFF1A2D28), onSurfaceVariant = Color(0xFF63766E),
-        outlineVariant = Color(0xFFDCE5E0),
+        outline = Color(0xFFA6B5AB), outlineVariant = Color(0xFFDCE5E0),
     )
-    val colors = if (accent == "paper") { if (darkTheme) scheme else scheme.copy(background = Color(0xFFF7F8F2), surfaceContainerHigh = Color(0xFFF0F2E9), outlineVariant = Color(0xFFE4E7DB)) }
+    val colors = if (accent == "paper") { if (darkTheme) scheme.copy(background = Color(0xFF191C18), surface = Color(0xFF232922),
+        surfaceContainerHigh = Color(0xFF30392E), surfaceVariant = Color(0xFF364031), onSurface = Color(0xFFF2EFE3), onSurfaceVariant = Color(0xFFC4CCBB))
+        else scheme.copy(primary = Color(0xFF317A57), primaryContainer = Color(0xFFDDF3E5), onPrimaryContainer = Color(0xFF244D38),
+            background = Color(0xFFFFF9EF), surface = Color.White, onSurface = Color(0xFF30392F), onSurfaceVariant = Color(0xFF697362),
+            surfaceVariant = Color(0xFFF1EFE5), surfaceContainerHigh = Color(0xFFF5F1E7), outline = Color(0xFFB4B7A7), outlineVariant = Color(0xFFE5E2D7)) }
     else if (accent == "green") scheme else if (darkTheme) scheme.copy(
         primary = Color(0xFFAEBEFF), onPrimary = Color(0xFF142967),
         primaryContainer = Color(0xFF263653), onPrimaryContainer = Color(0xFFDEE5FF),
@@ -65,7 +71,7 @@ fun LedgerTheme(darkTheme: Boolean = isSystemInDarkTheme(), accent: String = "bl
         surfaceVariant = Color(0xFF2C3142), surfaceContainerHigh = Color(0xFF222735),
         surfaceContainerHighest = Color(0xFF2C3142),
         onSurface = Color(0xFFE7E9F3), onSurfaceVariant = Color(0xFFB9C0D5),
-        outlineVariant = Color(0xFF353C50),
+        outline = Color(0xFF79859D), outlineVariant = Color(0xFF353C50),
     ) else scheme.copy(
         primary = Color(0xFF4F66D5), onPrimary = Color.White,
         primaryContainer = Color(0xFFEAF0FF), onPrimaryContainer = Color(0xFF2B4279),
@@ -75,7 +81,7 @@ fun LedgerTheme(darkTheme: Boolean = isSystemInDarkTheme(), accent: String = "bl
         surfaceVariant = Color(0xFFEBEEF7), surfaceContainerHigh = Color(0xFFEDF0F9),
         surfaceContainerHighest = Color(0xFFE5E9F4),
         onSurface = Color(0xFF252C3E), onSurfaceVariant = Color(0xFF6B7589),
-        outlineVariant = Color(0xFFE2E7F0),
+        outline = Color(0xFFA9B4CC), outlineVariant = Color(0xFFE2E7F0),
     )
     CompositionLocalProvider(LocalAccent provides accent) {
         MaterialTheme(colorScheme = colors, typography = ledgerTypography, shapes = ledgerShapes, content = content)

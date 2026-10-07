@@ -13,6 +13,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.localledger.app.R
+import com.localledger.app.ui.common.PageHeading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -26,8 +29,6 @@ import com.localledger.app.ui.common.visibleAmount
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-
-internal val lifeOrange = Color(0xFFED9354)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -76,13 +77,10 @@ fun LifeScreen(model: LifeViewModel) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 108.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("生活", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(today.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                }
+                PageHeading("生活的节奏", "把日子过成自己喜欢的样子", R.drawable.art_journal, eyebrow = "${today.monthValue}月${today.dayOfMonth}日 · 今日生活")
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LifeMetric("今日习惯", "$checkedToday/${habits.size}", Modifier.weight(1f))
                     LifeMetric("今日专注", "${focusedToday}m", Modifier.weight(1f))
                     LifeMetric("待复习", dueCards.size.toString(), Modifier.weight(1f))
@@ -90,7 +88,10 @@ fun LifeScreen(model: LifeViewModel) {
             }
             item {
                 OutlinedTextField(query, model::setSearch, Modifier.fillMaxWidth(), placeholder = { Text("搜索生活记录") },
-                    singleLine = true, shape = RoundedCornerShape(18.dp))
+                    singleLine = true, shape = RoundedCornerShape(18.dp),
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_ui_search), null, Modifier.size(20.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("日常", "计划", "日期", "学习", "总结").forEach { group ->
                         FilterChip(section == group, { section = group; model.setSearch("") }, label = { Text(group) })
@@ -189,7 +190,8 @@ fun LifeScreen(model: LifeViewModel) {
                     if (activeFocus == null) {
                         LifeSmallText("选定一件事，专注 1 至 180 分钟")
                         Button(onClick = { model.clearFeedback(); focusEditor = true }, enabled = !busy,
-                            colors = ButtonDefaults.buttonColors(containerColor = lifeOrange, contentColor = Color(0xFF442B19))) { Text("开始专注") }
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer)) { Text("开始专注") }
                     } else {
                         Text(activeFocus.title, style = MaterialTheme.typography.titleMedium)
                         val remaining = activeFocus.remainingSeconds(state.now)
@@ -260,7 +262,9 @@ fun LifeScreen(model: LifeViewModel) {
             }
         }
         if (section != "总结") ExtendedFloatingActionButton(onClick = { model.clearFeedback(); creating = true },
-            Modifier.align(Alignment.BottomEnd).padding(20.dp), containerColor = lifeOrange, contentColor = Color(0xFF442B19)) { Text("＋ 新建${section}") }
+            Modifier.align(Alignment.BottomEnd).padding(20.dp), containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            shape = RoundedCornerShape(20.dp)) { Text("＋ 新建${section}") }
     }
     if (creating) LifeCreateDialog(section = section, onDismiss = { creating = false }, onSelect = ::new,
         onFocus = { creating = false; focusEditor = true }, onStudy = { creating = false; cardId = null; cardEditor = true })
@@ -289,9 +293,9 @@ fun LifeScreen(model: LifeViewModel) {
 
 @Composable
 private fun LifeMetric(label: String, value: String, modifier: Modifier) {
-    Card(modifier, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+    Card(modifier.fillMaxHeight(), shape = RoundedCornerShape(20.dp, 8.dp, 20.dp, 20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -314,7 +318,7 @@ private fun LifeGroup(title: String, subtitle: String, expanded: Boolean = true,
 @Composable
 private fun LifeItemHeader(item: LifeItem, onEdit: () -> Unit, onDelete: () -> Unit, busy: Boolean, suffix: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.width(3.dp).height(40.dp).background(lifeOrange, RoundedCornerShape(2.dp)))
+        Box(Modifier.width(3.dp).height(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(2.dp)))
         Column(Modifier.weight(1f).clickable(onClick = onEdit).padding(vertical = 8.dp)) {
             Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             LifeSmallText(item.kind.label)

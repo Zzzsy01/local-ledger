@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.localledger.app.R
+import com.localledger.app.ui.common.PageHeading
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -30,21 +31,8 @@ fun SettingsScreen(
     val error by model.error.collectAsStateWithLifecycle()
     var information by remember { mutableStateOf<String?>(null) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("设置", style = MaterialTheme.typography.headlineSmall)
-            Text("按自己的习惯，安排每一天", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } }
-        item { Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(painterResource(if (memoMode) R.drawable.ic_ui_notebook else R.drawable.ic_ui_wallet), null,
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("随手账 ${model.versionName}", style = MaterialTheme.typography.titleMedium)
-                    Text("数据保存在本机 · 无需账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
-        } }
+        item { PageHeading("按你的习惯", "数据保存在本机 · 无需账号", if (memoMode) R.drawable.art_journal else R.drawable.art_wallet,
+            Modifier.padding(horizontal = 20.dp), "随手账 ${model.versionName}") }
         item { SectionTitle("主页与外观") }
         item { SettingsCard {
             Text("默认打开的主页", fontWeight = FontWeight.Medium)

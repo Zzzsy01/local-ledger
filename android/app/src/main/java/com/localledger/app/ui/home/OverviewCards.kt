@@ -5,6 +5,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import com.localledger.app.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,11 +27,15 @@ fun OverviewCards(ledger: LedgerRepository, assets: AssetRepository, onAccounts:
     val cash = balances.fold(BigInteger.ZERO) { total, balance -> total + BigInteger.valueOf(balance.balanceMinor) }
     val held = summarizeAssets(items)
     Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Card(onClick = onAccounts, shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("账户余额", style = MaterialTheme.typography.labelLarge)
-                Text("¥${if (LocalHideAmounts.current) "••••" else BigDecimal(cash, 2).toPlainString()}", style = MaterialTheme.typography.headlineLarge)
-                Text("${balances.size} 个账户 · 包含已停用账户余额", style = MaterialTheme.typography.bodySmall)
+        Card(onClick = onAccounts, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(painterResource(R.drawable.ic_ui_wallet), null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("账户余额", style = MaterialTheme.typography.labelLarge)
+                    Text("¥${if (LocalHideAmounts.current) "••••" else BigDecimal(cash, 2).toPlainString()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("${balances.size} 个账户 · 含已停用余额", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(painterResource(R.drawable.ic_ui_chevron_right), null, Modifier.size(18.dp))
             }
         }
         Card(onClick = onAssets, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {

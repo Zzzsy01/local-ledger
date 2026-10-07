@@ -32,6 +32,8 @@ Kotlin + Jetpack Compose + Navigation Compose + Room，Android 8.0（API 26）�
 
 ## 构建与检查
 
+1.7.0 采用明亮奶白、薄荷渐变、杏橙按钮与三张本地透明插画，更新主要页面的层次、悬浮导航和筛选布局。保留浅深色、澄蓝／青绿及原数据路径；发行继续使用原 GitHub 更新渠道。设计与素材见 [DESIGN.md](DESIGN.md)，验证见 [UI 升级记录](verification/ui-refresh.md)。
+
 Android Studio 打开当前 `android` 目录，安装 SDK Platform 36 和 Build Tools 35.0.0。命令行需要 JDK 17 或 21；SDK 路径由 Android Studio 自动写入本机的 `local.properties`，该文件不提交。
 
 Windows：
@@ -57,6 +59,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 测试安装时不使用 `adb uninstall`，卸载会清除本机账本。
 
 ## 当前版本验证
+
+2026-10-07，1.7.0：界面、同签名覆盖安装及原更新渠道的验证见 [UI 升级记录](verification/ui-refresh.md)。
 
 2026-10-05，1.6.0：37 项 JVM 测试与 26 项 Android 仪器测试通过，构建与 Lint 无错误。实际 1.5.0→1.6.0 覆盖升级保留原十三表全部字段；位置历史、估值、手记、全局物品搜索和功能分组流程通过。详见 [1.6.0 验证记录](verification/1.6.0.md)。
 

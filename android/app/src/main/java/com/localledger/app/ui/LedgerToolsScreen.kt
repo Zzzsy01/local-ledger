@@ -10,13 +10,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.localledger.app.R
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
+import com.localledger.app.ui.common.PageHeading
 
 @Composable
 fun LedgerToolsScreen(open: (String) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("记账工具", style = MaterialTheme.typography.headlineSmall)
-            Text("管理资金、安排收支、整理账单", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PageHeading("财务工具箱", "账户、预算与账单，各有安排", R.drawable.art_wallet, eyebrow = "井井有条 · 从容管理")
         }
         item { Text("资金管理", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary) }
         item { ToolLink("账户管理", "查看余额，新增或调整资金账户", "accounts", open) }
@@ -35,8 +38,18 @@ private fun ToolLink(title: String, description: String, route: String, open: (S
     Card(onClick = { open(route) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(painterResource(when(route) {
+                    "accounts" -> R.drawable.ic_ui_wallet
+                    "planning" -> R.drawable.ic_ui_calendar
+                    "reimbursement" -> R.drawable.ic_ui_arrow_up_right
+                    "capture" -> R.drawable.ic_ui_copy
+                    "import" -> R.drawable.ic_ui_arrow_down_right
+                    else -> R.drawable.ic_ui_notebook
+                }), null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Icon(painterResource(R.drawable.ic_ui_chevron_right), null, Modifier.size(18.dp))

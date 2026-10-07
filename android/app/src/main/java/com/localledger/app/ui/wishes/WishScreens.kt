@@ -2,6 +2,7 @@ package com.localledger.app.ui.wishes
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +31,7 @@ import com.localledger.app.ui.common.LocalHideAmounts
 import com.localledger.app.ui.common.Loading
 import com.localledger.app.ui.common.Message
 import com.localledger.app.ui.common.visibleAmount
+import com.localledger.app.ui.common.FeatureCard
 
 @Composable
 fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> Unit) {
@@ -41,17 +44,17 @@ fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> 
     var savingForId by rememberSaveable { mutableStateOf<String?>(null) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 32.dp)) {
-        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(painterResource(R.drawable.ic_ui_heart), contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Text("想买的东西", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        item { FeatureCard {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("心愿清单", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text("把喜欢，慢慢变成拥有", style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = .8f))
+                    }
+                    Image(painterResource(R.drawable.art_museum), null, Modifier.size(84.dp))
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("还需要攒", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .7f))
+                        color = LocalContentColor.current.copy(alpha = .8f))
                     Text("¥${visibleAmount(state.totals.remainingMinor)}", style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold)
                 }
@@ -63,11 +66,10 @@ fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> 
                 if (!hidden) {
                     LinearProgressIndicator(progress = { state.totals.progress },
                         modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)),
-                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = .12f))
+                        color = MaterialTheme.colorScheme.primary, trackColor = LocalContentColor.current.copy(alpha = .12f))
                 }
                 Text("每一步积累，都离心愿更近。", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .7f))
-            }
+                    color = LocalContentColor.current.copy(alpha = .8f))
         } }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("active" to "想买", "purchased" to "已达成").forEach { (value, label) ->
@@ -202,7 +204,7 @@ fun WishesScreen(model: WishesViewModel, onAdd: () -> Unit, onEdit: (String) -> 
 private fun WishSummaryMetric(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .65f))
+            color = LocalContentColor.current.copy(alpha = .8f))
         Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }

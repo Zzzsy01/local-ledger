@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +52,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Surface
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +78,7 @@ import com.localledger.app.ui.common.MonthPicker
 import com.localledger.app.ui.common.amountColor
 import com.localledger.app.ui.common.visibleAmount
 import com.localledger.app.ui.common.LocalAccent
+import com.localledger.app.ui.common.FeatureCard
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -106,10 +111,9 @@ fun HomeScreen(model: HomeViewModel, snackbar: SnackbarHostState, onEdit: (Strin
     ) {
         if (!state.search.open || !state.search.allDates) item { MonthPicker(state.month, model::changeMonth) }
         if (!state.search.open) {
-            item { overview() }
             item { SummaryCard(state.summary, "${state.month.monthValue}月收支概览", Modifier.padding(horizontal = 20.dp)) }
-            item { BudgetCard(state, onPlanning, onAccounts) }
             item { QuickEntries(state, onCopy, onAddTransaction) }
+            item { BudgetCard(state, onPlanning) }
             item { MonthCalendar(state, model::selectDay) }
         }
         item {
@@ -206,6 +210,7 @@ fun HomeScreen(model: HomeViewModel, snackbar: SnackbarHostState, onEdit: (Strin
                 }
             }
         }
+        if (!state.search.open) item { overview() }
         item { Spacer(Modifier.height(88.dp)) }
     }
     deletion?.let { entry ->
@@ -221,18 +226,20 @@ fun HomeScreen(model: HomeViewModel, snackbar: SnackbarHostState, onEdit: (Strin
 
 @Composable
 private fun SummaryCard(summary: MonthlySummary, title: String, modifier: Modifier = Modifier) {
-    val incomeColor = Color(0xFF287B60)
-    val expenseColor = Color(0xFFCF733B)
-    val cardColor = if (MaterialTheme.colorScheme.background.red > .5f) Color(0xFFFFF8EC) else MaterialTheme.colorScheme.surface
-    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = cardColor)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
-                Text("结余", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val incomeColor = if (dark) Color(0xFFBCE2C6) else Color(0xFF306C50)
+    val expenseColor = if (dark) Color(0xFFFFC9A5) else Color(0xFF965128)
+    FeatureCard(modifier) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(title, style = MaterialTheme.typography.labelLarge)
+                    Text("结余", color = LocalContentColor.current.copy(alpha = .8f), style = MaterialTheme.typography.bodySmall)
+                }
+                Image(painterResource(R.drawable.art_wallet), null, Modifier.size(84.dp))
             }
             Text("¥${visibleAmount(summary.income - summary.expense)}", style = MaterialTheme.typography.headlineLarge,
-                fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            HorizontalDivider(color = LocalContentColor.current.copy(alpha = .16f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -251,37 +258,31 @@ private fun SummaryCard(summary: MonthlySummary, title: String, modifier: Modifi
                     Text("¥${visibleAmount(summary.expense)}", color = expenseColor, fontWeight = FontWeight.SemiBold)
                 }
             }
-        }
     }
 }
 
 @Composable
-private fun BudgetCard(state: HomeState, onPlanning: () -> Unit, onAccounts: () -> Unit) {
+private fun BudgetCard(state: HomeState, onPlanning: () -> Unit) {
     val budget = state.budget
     val remaining = budget?.let { it.amountMinor - state.monthSummary.expense }
-    Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+    Card(onClick = onPlanning, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("${state.month.monthValue}月预算", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text(if (remaining == null) "给日常开销留一个界限" else if (remaining < 0) "已超支 ¥${visibleAmount(-remaining)}" else "还可支出 ¥${visibleAmount(remaining)}",
+                Column(Modifier.weight(1f)) {
+                    Text("${state.month.monthValue}月预算" + budget?.let { " · ¥${visibleAmount(it.amountMinor)}" }.orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(if (remaining == null) "点击设置，为开销留一个界限" else if (remaining < 0) "已超支 ¥${visibleAmount(-remaining)}" else "还可支出 ¥${visibleAmount(remaining)}",
                         color = if (remaining != null && remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall)
                 }
-                TextButton(onClick = onAccounts) { Text("账户") }
+                Icon(painterResource(R.drawable.ic_ui_chevron_right), "调整预算", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (budget != null) {
+            if (budget != null && !com.localledger.app.ui.common.LocalHideAmounts.current) {
                 val progress = (state.monthSummary.expense.toDouble() / budget.amountMinor).toFloat().coerceIn(0f, 1f)
                 Box(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))) {
                     Box(Modifier.fillMaxWidth(progress).height(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)))
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("已用 ¥${visibleAmount(state.monthSummary.expense)}", style = MaterialTheme.typography.labelSmall)
-                    Text("预算 ¥${visibleAmount(budget.amountMinor)}", style = MaterialTheme.typography.labelSmall)
-                }
             }
-            TextButton(onClick = onPlanning) { Text(if (budget == null) "设置月预算" else "调整预算") }
         }
     }
 }
@@ -297,14 +298,12 @@ private fun QuickEntries(state: HomeState, onCopy: (String) -> Unit, onAdd: () -
             }
             FilterChip(selected = false, onClick = onAdd, label = { Text("＋ 记一笔") })
         }
-        if (state.quickEntries.isNotEmpty()) Text("点常用分类复用最近账目，确认金额后保存。", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun MonthCalendar(state: HomeState, onSelect: (LocalDate?) -> Unit) {
-    var expanded by rememberSaveable { mutableStateOf(true) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     var heatType by rememberSaveable { mutableStateOf<Int?>(null) }
     val zone = ZoneId.systemDefault()
     val rows = remember(state.calendarEntries, zone) { state.calendarEntries.groupBy { Instant.ofEpochMilli(it.transaction.occurredAt).atZone(zone).toLocalDate() } }

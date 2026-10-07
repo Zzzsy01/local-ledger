@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import java.time.LocalDate
 import com.localledger.app.ui.life.LifeDate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +27,7 @@ import com.localledger.app.R
 import com.localledger.app.domain.Memo
 import com.localledger.app.ui.common.Loading
 import com.localledger.app.ui.common.Message
+import com.localledger.app.ui.common.PageHeading
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -45,20 +47,16 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
     var deleting by remember { mutableStateOf<Memo?>(null) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
         item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(if (kind == "todo") "待办事项" else "我的笔记", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text("随手记下，让生活有条不紊", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = add, modifier = Modifier.heightIn(min = 48.dp)) { Text("新建") }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PageHeading(if (kind == "todo") "今天，慢慢来" else "我的笔记", "随手记下，留住生活里的小事", R.drawable.art_journal,
+                    eyebrow = if (kind == "todo") "待办清单 · 做一件少一件" else "灵感 · 日常 · 小计划")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("全部" to state.total, "待完成" to state.unfinished, "置顶" to state.pinned).forEach { (label, count) ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(count.toString(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -67,12 +65,21 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
         item {
             FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("note" to "笔记", "todo" to "待办").forEach { (value, label) -> FilterChip(kind == value, { model.kind(value) }, label = { Text(label) }) }
+                var filtersOpen by remember { mutableStateOf(false) }
+                Box {
+                    TextButton({ filtersOpen = true }) { Text(when(filter) { "open" -> "未完成"; "pinned" -> "置顶"; "done" -> "已完成"; else -> "全部" } + " ▾") }
+                    DropdownMenu(filtersOpen, { filtersOpen = false }) {
+                        listOf("all" to "全部", "open" to "未完成", "pinned" to "置顶", "done" to "已完成").forEach { (value, label) ->
+                            DropdownMenuItem(text = { Text(label + if (filter == value) " ✓" else "") }, onClick = { model.filter(value); filtersOpen = false })
+                        }
+                    }
+                }
                 var foldersOpen by remember { mutableStateOf(false) }
                 var sortOpen by remember { mutableStateOf(false) }
-                Box { TextButton({ foldersOpen = true }) { Text("分组：$folder ▾") }
+                Box { TextButton({ foldersOpen = true }) { Text(if (folder == "全部") "分组 ▾" else "$folder ▾", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     DropdownMenu(foldersOpen, { foldersOpen = false }) { (listOf("全部") + state.folders).forEach { value ->
                         DropdownMenuItem(text = { Text(value) }, onClick = { model.folder(value); foldersOpen = false }) } } }
-                Box { TextButton({ sortOpen = true }) { Text("排序 ▾") }
+                Box { IconButton({ sortOpen = true }) { Icon(painterResource(R.drawable.ic_ui_settings), "笔记排序", Modifier.size(20.dp)) }
                     DropdownMenu(sortOpen, { sortOpen = false }) { listOf("updated" to "最近修改", "created" to "最近创建", "title" to "名称").forEach { (value, label) ->
                         DropdownMenuItem(text = { Text(label + if (sort == value) " ✓" else "") }, onClick = { model.sort(value); sortOpen = false }) } } }
             }
@@ -86,25 +93,12 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
         }
-        item {
-            FlowRow(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("all" to "全部", "open" to "未完成", "pinned" to "置顶", "done" to "已完成").forEach { (value, label) ->
-                    FilterChip(filter == value, { model.filter(value) }, label = { Text(label) },
-                        modifier = Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(.7.dp, if (filter == value) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant),
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer))
-                }
-            }
-        }
         if (state.loading) item { Loading() }
         state.error?.let { item { Message(it, true) } }
         if (!state.loading && state.error == null && state.items.isEmpty()) item {
             Surface(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.surface, border = BorderStroke(0.7.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(painterResource(R.drawable.ic_ui_notebook), contentDescription = null,
-                        modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
                     Text(if (state.total == 0) "留住第一个想法" else "没有符合条件的备忘录",
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(if (state.total == 0) "待办、灵感、每月复盘……\n把容易忘记的事情留在这里。" else "试试其他关键词或筛选条件。",
@@ -114,21 +108,23 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
             }
         }
         items(state.items, key = { it.id }) { memo ->
-            Card(onClick = { onEdit(memo.id) }, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = memoColor(memo.color), contentColor = Color(0xFF33332F))) {
+            val ink = if (MaterialTheme.colorScheme.background.luminance() < .5f) Color(0xFFF2EEE2) else Color(0xFF333B31)
+            Card(onClick = { onEdit(memo.id) }, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp, 24.dp, 24.dp, 24.dp),
+                colors = CardDefaults.cardColors(containerColor = memoColor(memo.color), contentColor = ink)) {
                 if (memo.kind == "todo") {
                     Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(memo.isDone, { model.complete(memo) }, enabled = !busy,
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF526446), uncheckedColor = Color(0xFF626451)))
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary, uncheckedColor = ink.copy(alpha = .65f)))
                         Column(Modifier.weight(1f).padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(memo.title, style = MaterialTheme.typography.titleMedium, color = Color(0xFF33332F),
+                            Text(memo.title, style = MaterialTheme.typography.titleMedium, color = ink,
                                 textDecoration = if (memo.isDone) TextDecoration.LineThrough else null, maxLines = 3)
-                            if (memo.content.isNotBlank()) Text(memo.content, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = Color(0xFF55574E))
+                            if (memo.content.isNotBlank()) Text(memo.content, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = .75f))
                             Text(memo.folder + memo.dueEpochDay?.let { " · ${LocalDate.ofEpochDay(it)}" }.orEmpty() + if (memo.isPinned) " · 置顶" else "",
-                                style = MaterialTheme.typography.labelSmall, color = Color(0xFF55574E))
+                                style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = .75f))
                         }
-                        IconButton({ model.pin(memo) }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_pin), if (memo.isPinned) "取消置顶" else "置顶", tint = Color(0xFF55574E), modifier = Modifier.size(18.dp)) }
-                        IconButton({ deleting = memo }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_trash), "删除待办", tint = Color(0xFF55574E), modifier = Modifier.size(18.dp)) }
+                        IconButton({ model.pin(memo) }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_pin), if (memo.isPinned) "取消置顶" else "置顶", tint = ink.copy(alpha = .75f), modifier = Modifier.size(18.dp)) }
+                        IconButton({ deleting = memo }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_trash), "删除待办", tint = ink.copy(alpha = .75f), modifier = Modifier.size(18.dp)) }
                     }
                 } else {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,17 +143,17 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
                     Text(memo.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         textDecoration = if (memo.isDone) TextDecoration.LineThrough else null,
-                        color = Color(0xFF33332F))
+                        color = ink)
                     if (memo.content.isNotBlank()) Text(memo.content, style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 5, overflow = TextOverflow.Ellipsis, color = Color(0xFF55574E))
-                    memo.dueEpochDay?.let { Text("到期 ${LocalDate.ofEpochDay(it)}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF55574E)) }
+                        maxLines = 4, overflow = TextOverflow.Ellipsis, color = ink.copy(alpha = .8f))
+                    memo.dueEpochDay?.let { Text("到期 ${LocalDate.ofEpochDay(it)}", style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = .75f)) }
                     val date = Instant.ofEpochMilli(memo.updatedAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                    Text(date, style = MaterialTheme.typography.labelSmall, color = Color(0xFF55574E))
+                    Text(date, style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = .7f))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), thickness = 0.7.dp)
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         FilledTonalButton(onClick = { model.complete(memo) }, enabled = !busy, shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color.White.copy(alpha = .4f), contentColor = Color(0xFF33332F))) {
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = ink.copy(alpha = .07f), contentColor = ink)) {
                             Icon(painterResource(R.drawable.ic_ui_check), contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(if (memo.isDone) "重新打开" else "完成")
@@ -187,7 +183,10 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
         confirmButton = { TextButton(onClick = model::dismissError) { Text("知道了") } }) }
 }
 
-private fun memoColor(color: String) = when(color) { "blue" -> Color(0xFFD3E6FA); "green" -> Color(0xFFDEEDD0); "pink" -> Color(0xFFF2DCE5); else -> Color(0xFFF6E7B6) }
+@Composable
+private fun memoColor(color: String): Color = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
+    when(color) { "blue" -> Color(0xFF293B49); "green" -> Color(0xFF344333); "pink" -> Color(0xFF493640); else -> Color(0xFF474331) }
+} else when(color) { "blue" -> Color(0xFFE4EDF3); "green" -> Color(0xFFE9EEDC); "pink" -> Color(0xFFF4E5E5); else -> Color(0xFFF3E9CA) }
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -206,7 +205,7 @@ fun MemoEditorScreen(model: MemoEditorViewModel, onSavingChanged: (Boolean) -> U
                 listOf("note" to "笔记", "todo" to "待办").forEach { (value, label) -> FilterChip(draft.kind == value, { model.change { it.copy(kind = value) } }, label = { Text(label) }, enabled = enabled) }
                 listOf("yellow" to "奶黄", "blue" to "雾蓝", "green" to "浅绿", "pink" to "粉色").forEach { (value, label) ->
                     FilterChip(draft.color == value, { model.change { it.copy(color = value) } }, label = { Text(label) }, enabled = enabled,
-                        colors = FilterChipDefaults.filterChipColors(containerColor = memoColor(value), selectedContainerColor = memoColor(value), labelColor = Color(0xFF33332F), selectedLabelColor = Color(0xFF33332F))) }
+                        colors = FilterChipDefaults.filterChipColors(containerColor = memoColor(value), selectedContainerColor = memoColor(value), labelColor = MaterialTheme.colorScheme.onSurface, selectedLabelColor = MaterialTheme.colorScheme.onSurface)) }
             } }
             item { OutlinedTextField(draft.folder, { value -> model.change { it.copy(folder = value) } }, Modifier.fillMaxWidth(), label = { Text("分组") }, singleLine = true, enabled = enabled) }
             if (draft.kind == "todo") item { LifeDate("到期日期", draft.dueDate, enabled, optional = true) { value -> model.change { it.copy(dueDate = value) } } }

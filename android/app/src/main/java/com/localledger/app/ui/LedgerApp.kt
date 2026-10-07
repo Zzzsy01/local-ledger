@@ -2,6 +2,14 @@ package com.localledger.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -147,16 +155,18 @@ fun LedgerApp(
             topBar = {
                 TopAppBar(
                     title = {
-                        if (mainRoute) SingleChoiceSegmentedButtonRow(Modifier.width(184.dp)) {
-                            listOf(true to "备忘录", false to "记账").forEachIndexed { index, (mode, label) ->
-                                SegmentedButton(selected = memoMode == mode, onClick = { memoMode = mode },
-                                    shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {},
-                                    border = SegmentedButtonDefaults.borderStroke(color = Color.Transparent),
-                                    colors = SegmentedButtonDefaults.colors(
-                                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        activeContentColor = MaterialTheme.colorScheme.primary,
-                                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text(label, maxLines = 1) }
+                        if (mainRoute) Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                            SingleChoiceSegmentedButtonRow(Modifier.width(184.dp).padding(4.dp)) {
+                                listOf(true to "备忘录", false to "记账").forEachIndexed { index, (mode, label) ->
+                                    SegmentedButton(selected = memoMode == mode, onClick = { memoMode = mode },
+                                        shape = RoundedCornerShape(24.dp), icon = {},
+                                        border = SegmentedButtonDefaults.borderStroke(color = Color.Transparent),
+                                        colors = SegmentedButtonDefaults.colors(
+                                            activeContainerColor = MaterialTheme.colorScheme.primary,
+                                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                                            inactiveContainerColor = Color.Transparent,
+                                            inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+                                }
                             }
                         } else Text(when (route) {
                         "assets" -> "物品"
@@ -195,10 +205,10 @@ fun LedgerApp(
                     },
                     actions = {
                         if (!editing) {
-                            IconButton(onClick = { navigation.navigate("asset/search") }) {
+                            IconButton(onClick = { navigation.navigate("asset/search") }, modifier = Modifier.padding(2.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)) {
                                 Icon(painterResource(R.drawable.ic_ui_search), "全局找东西")
                             }
-                            if (mainRoute) IconButton(onClick = { navigation.navigate("settings") }) {
+                            if (mainRoute) IconButton(onClick = { navigation.navigate("settings") }, modifier = Modifier.padding(2.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)) {
                                 Icon(painterResource(R.drawable.ic_ui_settings), "设置")
                             }
                         }
@@ -207,7 +217,9 @@ fun LedgerApp(
                 )
             },
             bottomBar = {
-                if (mainRoute) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                if (mainRoute) Surface(Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 3.dp) {
+                NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets(0, 0, 0, 0)) {
                     val pages = if (memoMode) listOf("memos" to "备忘录", "life" to "生活", "museum" to "博物馆", "wishes" to "心愿")
                         else listOf("home" to "账单", "stats" to "报表", "museum" to "博物馆", "tools" to "工具")
                     pages.forEach { (destination, label) ->
@@ -223,11 +235,12 @@ fun LedgerApp(
                                 "stats" -> R.drawable.ic_ui_report
                                 else -> R.drawable.ic_ui_settings
                             }), contentDescription = null) },
-                            label = { Text(label) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primaryContainer),
+                            label = { Text(label, fontSize = 11.sp, fontWeight = if (route == destination) FontWeight.SemiBold else FontWeight.Normal) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primary),
                         )
                     }
+                }
                 }
             },
             floatingActionButton = {
@@ -235,9 +248,10 @@ fun LedgerApp(
                     modifier = Modifier.semantics { contentDescription = when(route) { "assets", "museum" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" } },
                     onClick = { navigation.navigate(when(route) { "assets", "museum" -> "asset/add"; "memos" -> if (addingTask) "memo/task" else "memo/add"; else -> "add" }) },
                     icon = { Icon(painterResource(R.drawable.ic_ui_plus), null) },
-                    text = { Text(when(route) { "assets", "museum" -> "添加物品"; "memos" -> if (addingTask) "新建待办" else "新建备忘录"; else -> "记一笔" }) },
-                    containerColor = if (route == "memos") Color(0xFFF3DF9A) else Color(0xFFF2A35A),
-                    contentColor = Color(0xFF382A1C),
+                    text = { Text(when(route) { "assets", "museum" -> "添加藏品"; "memos" -> if (addingTask) "新建待办" else "写笔记"; else -> "记一笔" }) },
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
             },
             snackbarHost = { SnackbarHost(snackbar) },

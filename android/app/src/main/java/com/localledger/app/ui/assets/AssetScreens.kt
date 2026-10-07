@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +48,7 @@ import com.localledger.app.domain.*
 import com.localledger.app.ui.common.Loading
 import com.localledger.app.ui.common.Message
 import com.localledger.app.ui.common.visibleAmount
+import com.localledger.app.ui.common.PageHeading
 import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -58,14 +60,14 @@ fun AssetsScreen(model: AssetsViewModel, onEdit: (String) -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
     var deleting by remember { mutableStateOf<Asset?>(null) }
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
     val stackSummary = LocalConfiguration.current.screenWidthDp < 360 || LocalDensity.current.fontScale > 1.2f
     LazyVerticalGrid(GridCells.Fixed(if (state.filters.grid) 2 else 1), Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 104.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("我的博物馆", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("每件物品都有位置，也有故事。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PageHeading("我的博物馆", "珍藏每件物品，也珍藏它的故事", R.drawable.art_museum, eyebrow = "私人展柜 · 日常珍藏")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("全部藏品" to state.total, "收藏展柜" to state.favoriteCount, "待整理" to state.needsOrganizingCount).forEach { (label, count) ->
                         FilterChip(state.filters.collection == label, { model.filter { it.copy(collection = label) } }, label = { Text("$label $count") })
@@ -83,22 +85,33 @@ fun AssetsScreen(model: AssetsViewModel, onEdit: (String) -> Unit) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             OutlinedTextField(state.filters.query, { query -> model.filter { it.copy(query = query) } }, Modifier.fillMaxWidth(),
                 placeholder = { Text("搜索名称、位置、标签、编号或历史") }, singleLine = true, shape = RoundedCornerShape(18.dp),
-                leadingIcon = { Icon(painterResource(R.drawable.ic_ui_search), null, Modifier.size(20.dp)) })
+                leadingIcon = { Icon(painterResource(R.drawable.ic_ui_search), null, Modifier.size(20.dp)) },
+                trailingIcon = { IconButton(onClick = { filtersOpen = !filtersOpen }) {
+                    Icon(painterResource(R.drawable.ic_ui_settings), if (filtersOpen) "收起藏品筛选" else "筛选藏品", Modifier.size(20.dp))
+                } },
+                colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
         }
-        item(span = { GridItemSpan(maxLineSpan) }) {
+        if (filtersOpen) item(span = { GridItemSpan(maxLineSpan) }) {
             AssetFilterMenu(state.filters.location, (listOf("全部位置", "未填位置") + state.locations).distinct(), Modifier.fillMaxWidth()) { location -> model.filter { it.copy(location = location) } }
         }
-        item(span = { GridItemSpan(maxLineSpan) }) {
+        if (filtersOpen) item(span = { GridItemSpan(maxLineSpan) }) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 AssetFilterMenu(state.filters.status, listOf("全部") + assetStatuses, Modifier.weight(1f)) { selected -> model.filter { it.copy(status = selected) } }
                 AssetFilterMenu(if (state.filters.kind == "全部") "分类" else state.filters.kind, listOf("全部") + state.kinds, Modifier.weight(1f)) { selected -> model.filter { it.copy(kind = selected) } }
                 AssetFilterMenu("排序", assetSorts, Modifier.weight(1f)) { selected -> model.filter { it.copy(sort = selected) } }
+            }
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val active = listOf(state.filters.location.takeUnless { it == "全部位置" }, state.filters.status.takeUnless { it == "全部" }, state.filters.kind.takeUnless { it == "全部" }).filterNotNull()
+                Text((listOf("${state.items.size} 件藏品", state.filters.sort) + active).joinToString(" · "), Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 IconButton(onClick = { model.filter { it.copy(grid = !it.grid) } }, modifier = Modifier.semantics { contentDescription = if (state.filters.grid) "切换列表" else "切换网格" }) {
-                    Text(if (state.filters.grid) "☰" else "▦", style = MaterialTheme.typography.headlineSmall)
+                    Text(if (state.filters.grid) "☰" else "▦", style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
-        item(span = { GridItemSpan(maxLineSpan) }) { Text("${state.items.size} 条物品记录 · ${state.filters.sort}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         if (state.loading) item(span = { GridItemSpan(maxLineSpan) }) { Loading() }
         state.error?.let { item(span = { GridItemSpan(maxLineSpan) }) { Message(it, true) } }
         if (!state.loading && state.items.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -114,7 +127,7 @@ fun AssetsScreen(model: AssetsViewModel, onEdit: (String) -> Unit) {
 @Composable
 private fun SummaryCard(title: String, value: String, detail: String, modifier: Modifier, lightColor: Color) {
     val color = if (MaterialTheme.colorScheme.background.luminance() > .5f) lightColor else MaterialTheme.colorScheme.surfaceContainerHigh
-    Card(modifier, shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = color)) {
+    Card(modifier, shape = RoundedCornerShape(22.dp, 8.dp, 22.dp, 22.dp), colors = CardDefaults.cardColors(containerColor = color)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -140,8 +153,9 @@ private fun AssetCard(asset: Asset, grid: Boolean, file: File?, historyMatch: Bo
     val daily = assetDailyCostMinor(asset, today)
     Card(Modifier.fillMaxWidth().clickable(onClick = onEdit), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))) {
         Column(Modifier.padding(if (grid) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (grid && file != null) AssetPhoto(file, Modifier.fillMaxWidth().aspectRatio(1.2f), asset.name)
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AssetPhoto(file, Modifier.size(if (grid) 56.dp else 76.dp), asset.name)
+                if (!grid || file == null) AssetPhoto(file, Modifier.size(if (grid) 48.dp else 76.dp), asset.name)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(asset.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text("${asset.acquisition} · ${asset.kind}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)

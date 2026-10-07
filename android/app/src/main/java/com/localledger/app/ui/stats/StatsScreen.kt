@@ -23,6 +23,10 @@ import com.localledger.app.ui.common.LocalHideAmounts
 import com.localledger.app.ui.common.Loading
 import com.localledger.app.ui.common.Message
 import com.localledger.app.ui.common.visibleAmount
+import com.localledger.app.ui.common.PageHeading
+import com.localledger.app.ui.common.FeatureCard
+import com.localledger.app.R
+import androidx.compose.ui.graphics.Color
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -40,10 +44,7 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
     val kind = if (state.type == INCOME) "收入" else "支出"
     val hidden = LocalHideAmounts.current
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("收支报表", style = MaterialTheme.typography.headlineSmall)
-            Text("看清变化，找到花钱的方向", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } }
+        item { PageHeading("收支报表", "看清变化，让每一笔都有方向", R.drawable.art_wallet, Modifier.padding(horizontal = 20.dp), "回顾 · 发现 · 调整") }
         item {
             SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
                 ReportPeriod.entries.forEachIndexed { index, period ->
@@ -71,12 +72,28 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
         if (state.loading) item { Loading() }
         state.error?.let { error -> item { Message(error, isError = true) } }
         if (!state.loading && state.error == null) {
-            item { ReportOverview(state, total, kind) }
+            item { ReportOverview(state) }
+            item { ReportCard("${kind}趋势") {
+                Text(if (state.monthlyPoints) "按月汇总 · 点选图表查看金额" else "按日汇总 · 点选图表查看金额",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TimelineChart(state.points.map { point -> ChartValue(point.date.format(DateTimeFormatter.ofPattern(
+                    if (state.monthlyPoints) "yyyy/M" else "M/d")), if (state.type == INCOME) point.summary.income else point.summary.expense) })
+            } }
             item { ReportCard("本期小结") {
                 val top = state.categories.firstOrNull()
                 Text(if (top == null) "这个周期还没有${kind}记录。" else
                     "${kind}最多的是「${top.name}」${if (hidden) "。" else "，占 ${reportPercentage(top.total, total)}。"}",
                     style = MaterialTheme.typography.bodyMedium)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OverviewValue("区间日均${kind}", averageMinor(total, state.range.days), Modifier.weight(1f))
+                    OverviewValue("比${state.previousLabel}${kind}", total - previous, Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OverviewValue("单笔平均支出", averageMinor(state.summary.expense, state.metrics.expenseCount), Modifier.weight(1f))
+                    OverviewValue("最大单笔支出", state.metrics.largestExpense, Modifier.weight(1f))
+                }
+                if (!hidden && state.summary.income > 0) Text("结余率 ${reportPercentage(state.summary.income - state.summary.expense, state.summary.income)}",
+                    style = MaterialTheme.typography.bodySmall)
                 if (!hidden) {
                     percentageChange(total, previous)?.let { Text("比${state.previousLabel} $it", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
                     if (state.period in listOf(ReportPeriod.MONTH, ReportPeriod.YEAR)) percentageChange(total, yearAgo)?.let {
@@ -89,12 +106,6 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
                     Text("当前周期尚未结束，变化比例与完整前期比较。", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            } }
-            item { ReportCard("${kind}趋势") {
-                Text(if (state.monthlyPoints) "按月汇总 · 点选图表查看金额" else "按日汇总 · 点选图表查看金额",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TimelineChart(state.points.map { point -> ChartValue(point.date.format(DateTimeFormatter.ofPattern(
-                    if (state.monthlyPoints) "yyyy/M" else "M/d")), if (state.type == INCOME) point.summary.income else point.summary.expense) })
             } }
             item { ReportCard("${kind}分类构成") { CategoryRing(state.categories, total) } }
             item { ReportCard(if (state.period == ReportPeriod.YEAR) "全年月度${kind}对比" else "近六个月${kind}对比") {
@@ -141,29 +152,15 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
 }
 
 @Composable
-private fun ReportOverview(state: StatsState, total: Long, kind: String) {
-    Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun ReportOverview(state: StatsState) {
+    FeatureCard(Modifier.padding(horizontal = 20.dp)) {
             Text("本期结余", style = MaterialTheme.typography.labelLarge)
             Text("¥${visibleAmount(state.summary.income - state.summary.expense)}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewValue("收入", state.summary.income, Modifier.weight(1f))
                 OverviewValue("支出", state.summary.expense, Modifier.weight(1f))
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .12f))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OverviewValue("区间日均${kind}", averageMinor(total, state.range.days), Modifier.weight(1f))
-                OverviewValue("比${state.previousLabel}${kind}", total - if (state.type == INCOME) state.previous.income else state.previous.expense, Modifier.weight(1f))
-            }
             Text("共 ${state.metrics.transactionCount} 笔 · 日均按区间 ${state.range.days} 天计算", style = MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OverviewValue("单笔平均支出", averageMinor(state.summary.expense, state.metrics.expenseCount), Modifier.weight(1f))
-                OverviewValue("最大单笔支出", state.metrics.largestExpense, Modifier.weight(1f))
-            }
-            if (!LocalHideAmounts.current && state.summary.income > 0) Text("结余率 ${reportPercentage(state.summary.income - state.summary.expense, state.summary.income)}",
-                style = MaterialTheme.typography.bodySmall)
-        }
     }
 }
 
