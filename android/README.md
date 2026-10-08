@@ -60,7 +60,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 当前版本验证
 
-2026-10-07，1.7.0：界面、同签名覆盖安装及原更新渠道的验证见 [UI 升级记录](verification/ui-refresh.md)。
+2026-10-07 至 2026-10-08，[1.7.0 已正式发行](https://github.com/Zzzsy01/local-ledger/releases/tag/v1.7.0)：公开清单与 APK 核对一致，旧客户端通知、下载校验及应用内覆盖安装通过。界面与发行验证见 [UI 升级记录](verification/ui-refresh.md)。
 
 2026-10-05，1.6.0：37 项 JVM 测试与 26 项 Android 仪器测试通过，构建与 Lint 无错误。实际 1.5.0→1.6.0 覆盖升级保留原十三表全部字段；位置历史、估值、手记、全局物品搜索和功能分组流程通过。详见 [1.6.0 验证记录](verification/1.6.0.md)。
 

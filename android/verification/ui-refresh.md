@@ -1,6 +1,6 @@
 # UI 视觉升级验证
 
-日期：2026-10-07。发行版本为 1.7.0 / 12，沿用原 GitHub 更新渠道。
+日期：2026-10-07 至 2026-10-08。发行版本为 1.7.0 / 12，沿用原 GitHub 更新渠道。
 
 ## 构建与素材
 
@@ -36,3 +36,15 @@ python scripts/check-ui.py "$env:ANDROID_HOME\platform-tools\adb.exe" emulator-5
 - SHA-256：`03ceddffd9dc4e863b69f006c91cfb86c46c8917860cb0c08899f501da7d07de`。
 - 签名证书 SHA-256：`447144514e8fb7d24c34a515f8aa70d014cebb4599629947f88302dc839956c9`，与原安装包一致。
 - 1.6.0 原发行包与验证记录继续保留；1.7.0 使用新标签和新安装包文件名，原固定更新地址继续沿用。
+
+## 公开发行核对
+
+- 2026-10-07 已使用原 `scripts/publish-update.ps1` 正式发布 [v1.7.0](https://github.com/Zzzsy01/local-ledger/releases/tag/v1.7.0)，先上传草稿附件，再公开为最新版。标签对应源码提交 `7e28bc98124fee4c793762eeb16ebe7b9ac6a3fb`。
+- 原固定 [更新地址](https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json) 与清单指定的 [APK](https://github.com/Zzzsy01/local-ledger/releases/download/v1.7.0/ledger-1.7.0.apk) 均经匿名 HTTPS 下载返回 200。清单为 1.7.0 / 12；公开 APK 字节数与 SHA-256 均与上述发行包一致。
+- 专用模拟器的 1.6.0 / 11 客户端通过原 JobScheduler 检查任务收到「随手账 1.7.0 可更新」通知；应用内「检查更新」显示「发现新版本 1.7.0」。测试主动触发既有任务，不代表实体手机已收到通知。
+- 旧客户端从原渠道完成下载，显示「校验通过，可以覆盖安装并保留数据」。缓存 APK 的 SHA-256 与公开发行包一致；客户端已有包名、版本和签名检查保持启用。
+- 2026-10-08 从旧客户端「安装更新」进入 Android 系统安装器并完成覆盖升级；安装器显示 `App installed.`，安装后实际版本为 1.7.0 / 12。未卸载、未清除数据。
+- 升级后仍可见原 3 条笔记（含「周末的小计划」）、2 件藏品（含 `MuseumCamera`）、2 个待买心愿（含「微单相机」）和本月支出 ¥96.00、预算 ¥5000.00。本次核对可见记录，未执行全部数据库字段快照比较。
+- 升级后原自动检查开关仍开启，更新地址未变；再次检查提示「当前已是最新版本」。AndroidRuntime 日志未发现崩溃，结束时恢复笔记页、440 dpi 与 1.0 倍字体。
+
+客户端截图与 UI 层次证据：`build/releases/v1.7.0/client-check/`，包含旧版发现更新、下载校验、系统安装完成、升级后的主要页面与最新版检查。公开下载核对文件位于 `build/releases/v1.7.0/`。未验证实体手机；日常自动检查时间仍由 Android 系统调度。
