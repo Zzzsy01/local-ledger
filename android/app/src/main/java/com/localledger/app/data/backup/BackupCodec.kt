@@ -108,6 +108,7 @@ object BackupCodec {
             val input = JSONTokener(text)
             val json = input.nextValue()
             require(json is JSONObject && input.nextClean() == '\u0000') { "备份必须是一个完整的 JSON 对象。" }
+            require(json.optString("format") != FinanceExportCodec.FORMAT) { "这是财务分析文件，不能用于完整恢复。请选择完整备份。" }
             val version = json.integer("version")
             require(version in 1..6) { "不支持此备份版本。" }
             return LedgerSnapshot(

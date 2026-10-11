@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.luminance
 import java.time.LocalDate
 import com.localledger.app.ui.life.LifeDate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.localledger.app.R
 import com.localledger.app.domain.Memo
 import com.localledger.app.ui.common.Loading
@@ -34,8 +36,11 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String) -> Unit) {
+fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String) -> Unit,
+    onLife: (String) -> Unit = {}, onFocus: (String) -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
+    val today by model.today.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.refreshToday() }
     val query by model.query.collectAsStateWithLifecycle()
     val filter by model.filter.collectAsStateWithLifecycle()
     val kind by model.kind.collectAsStateWithLifecycle()
@@ -46,6 +51,33 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
     val add = { onAdd(kind) }
     var deleting by remember { mutableStateOf<Memo?>(null) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
+        item { Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("今天 · ${today.date.monthValue}月${today.date.dayOfMonth}日", style = MaterialTheme.typography.titleMedium)
+                when {
+                    today.loading -> Text("正在读取今日安排…", style = MaterialTheme.typography.bodySmall)
+                    today.error != null -> Text(today.error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                    else -> {
+                        Text(if (today.tasks.isEmpty()) "没有到期待办，未设日期的任务仍在清单。" else "${today.tasks.size} 项到期或逾期待办", style = MaterialTheme.typography.bodySmall)
+                        today.tasks.take(3).forEach { task ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { onEdit(task.id) }, modifier = Modifier.weight(1f)) {
+                                    Text(task.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                                TextButton(onClick = { onFocus(task.title) }, enabled = today.focus == null) { Text("专注") }
+                            }
+                        }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { onLife("habits") }) { Text("今日习惯 ${today.habits} 项") }
+                            TextButton(onClick = { onLife("review") }) { Text("待复习 ${today.dueCards} 张") }
+                        }
+                        today.focus?.let { focus -> TextButton(onClick = { onLife("focus") }) {
+                            Text("${if (focus.status == com.localledger.app.domain.FocusStatus.RUNNING) "进行中" else "已暂停"}：${focus.title}", maxLines = 2)
+                        } }
+                    }
+                }
+            }
+        } }
         item {
             Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 PageHeading(if (kind == "todo") "今天，慢慢来" else "我的笔记", "随手记下，留住生活里的小事", R.drawable.art_journal,
@@ -126,6 +158,8 @@ fun MemosScreen(model: MemosViewModel, onAdd: (String) -> Unit, onEdit: (String)
                         IconButton({ model.pin(memo) }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_pin), if (memo.isPinned) "取消置顶" else "置顶", tint = ink.copy(alpha = .75f), modifier = Modifier.size(18.dp)) }
                         IconButton({ deleting = memo }, enabled = !busy) { Icon(painterResource(R.drawable.ic_ui_trash), "删除待办", tint = ink.copy(alpha = .75f), modifier = Modifier.size(18.dp)) }
                     }
+                    if (!memo.isDone) TextButton(onClick = { onFocus(memo.title) }, enabled = !busy && today.focus == null,
+                        modifier = Modifier.padding(horizontal = 16.dp)) { Text("开始专注", color = ink) }
                 } else {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {

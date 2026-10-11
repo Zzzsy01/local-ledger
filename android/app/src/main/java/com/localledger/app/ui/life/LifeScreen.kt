@@ -3,6 +3,8 @@ package com.localledger.app.ui.life
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,14 +34,14 @@ import java.time.ZoneId
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LifeScreen(model: LifeViewModel) {
+fun LifeScreen(model: LifeViewModel, initialSection: String = "日常", initialFocusTitle: String = "", initialReview: Boolean = false) {
     val state by model.state.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     val query by model.search.collectAsStateWithLifecycle()
     val monthly by model.monthlySummary.collectAsStateWithLifecycle()
-    var section by rememberSaveable { mutableStateOf("日常") }
+    var section by rememberSaveable { mutableStateOf(initialSection) }
     val listState = rememberLazyListState()
     LaunchedEffect(section) { listState.scrollToItem(0) }
     var creating by rememberSaveable { mutableStateOf(false) }
@@ -50,12 +52,13 @@ fun LifeScreen(model: LifeViewModel) {
     var timesOpen by rememberSaveable { mutableStateOf(true) }
     var recordsOpen by rememberSaveable { mutableStateOf(true) }
     var habitsOpen by rememberSaveable { mutableStateOf<String?>(null) }
-    var focusEditor by rememberSaveable { mutableStateOf(false) }
+    var focusEditor by rememberSaveable { mutableStateOf(initialFocusTitle.isNotBlank()) }
     var focusHistory by rememberSaveable { mutableStateOf(false) }
     var deletingFocus by rememberSaveable { mutableStateOf<String?>(null) }
     var cardEditor by rememberSaveable { mutableStateOf(false) }
     var cardId by rememberSaveable { mutableStateOf<String?>(null) }
-    var reviewing by rememberSaveable { mutableStateOf(false) }
+    var reviewing by rememberSaveable { mutableStateOf(initialReview) }
+    var summaryDetails by rememberSaveable { mutableStateOf<String?>(null) }
     var cardList by rememberSaveable { mutableStateOf(false) }
     var deletingCard by rememberSaveable { mutableStateOf<String?>(null) }
     val zone = ZoneId.systemDefault()
@@ -258,6 +261,10 @@ fun LifeScreen(model: LifeViewModel) {
                     summary.averageMood?.let { Text("平均心情 ${"%.1f".format(it)}/5") }
                     Text("本期复习过的单词 ${summary.studyReviews} 张")
                     Text("本期更新且已完成的计划 ${summary.completedPlans} 个")
+                    FlowRow {
+                        TextButton(onClick = { summaryDetails = "habits" }) { Text("查看本期打卡") }
+                        TextButton(onClick = { summaryDetails = "focus" }) { Text("查看本期专注") }
+                    }
                 }
             }
         }
@@ -277,7 +284,24 @@ fun LifeScreen(model: LifeViewModel) {
     state.items.find { it.id == deletingId }?.let { item ->
         LifeDeleteDialog(item.title, busy, error, onDismiss = { deletingId = null }, onConfirm = { model.delete(item) { deletingId = null } })
     }
-    if (focusEditor) FocusCreateDialog(busy, error, { focusEditor = false; model.clearFeedback() }) { title, minutes -> model.startFocus(title, minutes) { focusEditor = false } }
+    if (focusEditor && !state.loading) FocusCreateDialog(busy, error, { focusEditor = false; model.clearFeedback() }, initialTitle = initialFocusTitle) { title, minutes -> model.startFocus(title, minutes) { focusEditor = false } }
+    summaryDetails?.let { detail ->
+        val summary = lifeSummary(state.items, state.checkIns, state.focusSessions, state.cards, today, monthly)
+        val through = minOf(today, summary.endExclusive.minusDays(1))
+        val lines = if (detail == "habits") state.checkIns.filter { !it.isDeleted && it.dateEpochDay in summary.start.toEpochDay()..through.toEpochDay() &&
+            state.items.any { item -> item.id == it.itemId && !item.isDeleted && item.kind == LifeKind.HABIT } }
+            .sortedByDescending { it.dateEpochDay }.map { check -> "${LocalDate.ofEpochDay(check.dateEpochDay)} · ${state.items.firstOrNull { it.id == check.itemId }?.title.orEmpty()}" }
+        else state.focusSessions.filter { !it.isDeleted && it.status == FocusStatus.COMPLETED && it.completedAt?.let { time ->
+            val date = Instant.ofEpochMilli(time).atZone(zone).toLocalDate(); date in summary.start..through } == true }
+            .sortedByDescending { it.completedAt }.map { session -> "${Instant.ofEpochMilli(requireNotNull(session.completedAt)).atZone(zone).toLocalDate()} · ${session.title} · ${session.durationSeconds / 60} 分钟" }
+        AlertDialog(onDismissRequest = { summaryDetails = null }, title = { Text(if (detail == "habits") "本期打卡记录" else "本期专注记录") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${summary.start} — $through · 共 ${lines.size} 条")
+                if (lines.isEmpty()) Text("这个区间没有记录")
+                lines.take(100).forEach { Text(it) }
+                if (lines.size > 100) Text("显示最近 100 条，总数包含全部记录。")
+            } }, confirmButton = { TextButton(onClick = { summaryDetails = null }) { Text("关闭") } })
+    }
     state.focusSessions.find { it.id == deletingFocus }?.let { session ->
         LifeDeleteDialog(session.title, busy, error, onDismiss = { deletingFocus = null }, onConfirm = { model.deleteFocus(session) { deletingFocus = null } },
             description = if (session.status == FocusStatus.COMPLETED) "删除后将不再计入专注总结。" else "本次计时将停止，不计入已完成专注。")

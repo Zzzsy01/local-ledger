@@ -49,6 +49,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -91,6 +93,10 @@ import com.localledger.app.ui.importing.CaptureScreen
 import com.localledger.app.domain.paymentHint
 import com.localledger.app.domain.formatAmount
 import com.localledger.app.domain.EXPENSE
+import com.localledger.app.domain.ReportRange
+import com.localledger.app.ui.backup.FinanceExportScreen
+import com.localledger.app.ui.backup.FinanceExportViewModel
+import com.localledger.app.ui.home.SearchDraft
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,6 +128,12 @@ fun LedgerApp(
         val modeStates = rememberSaveableStateHolder()
         var memoMode by rememberSaveable { mutableStateOf(settings.defaultHome == "memos") }
         val navigation = if (memoMode) memoNavigation else ledgerNavigation
+        fun openEntries(range: ReportRange, type: Int, category: String? = null) {
+            navigation.navigate("details/${range.from.toEpochDay()}/${range.through.toEpochDay()}/$type/${category ?: "-"}")
+        }
+        fun openLife(action: String, title: String = "") {
+            navigation.navigate("life?section=${if (action == "habits") "日常" else "学习"}&focusTitle=${android.net.Uri.encode(title)}&review=${action == "review"}")
+        }
         val startRoute = if (memoMode) "memos" else "home"
         fun openMain(destination: String) {
             navigation.navigate(destination) {
@@ -136,10 +148,10 @@ fun LedgerApp(
             else { navigation.navigate(it) { launchSingleTop = true }; onRouteHandled() }
         } }
         val backStack by navigation.currentBackStackEntryAsState()
-        val route = backStack?.destination?.route ?: startRoute
+        val route = backStack?.destination?.route?.substringBefore('?') ?: startRoute
         val memoKind = if (route == "memos" && backStack != null) {
             val model: MemosViewModel = viewModel(viewModelStoreOwner = backStack!!, factory = remember(memoRepository) {
-                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle()) } }
+                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle(), lifeRepository) } }
             })
             val kind by model.kind.collectAsStateWithLifecycle()
             kind
@@ -181,11 +193,13 @@ fun LedgerApp(
                         "tasks" -> "待办事项"
                         "accounts" -> "账户管理"
                         "reimbursement" -> "报销管理"
+                        "details/{from}/{through}/{type}/{category}" -> "账目明细"
                         "recycle" -> "回收站"
                         "capture" -> "截图与自动采集"
                         "capture-entry" -> "核对账目"
                         "planning" -> "预算与固定账目"
                         "import" -> "导入账单"
+                        "finance-export" -> "财务分析导出"
                         "memos" -> "备忘录"
                         "memo/task" -> "新建待办"
                         "memo/add" -> "新建备忘录"
@@ -266,6 +280,7 @@ fun LedgerApp(
                             })
                             HomeScreen(model, snackbar, onEdit = { navigation.navigate("edit/$it") }, onCopy = { navigation.navigate("copy/$it") },
                                 onAccounts = { navigation.navigate("accounts") }, onAddTransaction = { navigation.navigate("add") }, onPlanning = { navigation.navigate("planning") },
+                                onBudgetEntries = { openEntries(ReportRange(it.atDay(1), it.atEndOfMonth()), EXPENSE) },
                                 overview = { OverviewCards(repository, assetRepository, { navigation.navigate("accounts") }, { openMain("museum") }) })
                         }
                         composable("accounts") {
@@ -290,7 +305,19 @@ fun LedgerApp(
                             val model: StatsViewModel = viewModel(factory = remember(repository) {
                                 viewModelFactory { initializer { StatsViewModel(repository, createSavedStateHandle()) } }
                             })
-                            StatsScreen(model, onEdit = { navigation.navigate("edit/$it") })
+                            StatsScreen(model, onEdit = { navigation.navigate("edit/$it") }, onEntries = ::openEntries)
+                        }
+                        composable("details/{from}/{through}/{type}/{category}") { entry ->
+                            val args = requireNotNull(entry.arguments)
+                            val from = java.time.LocalDate.ofEpochDay(requireNotNull(args.getString("from")).toLong())
+                            val through = java.time.LocalDate.ofEpochDay(requireNotNull(args.getString("through")).toLong())
+                            val type = requireNotNull(args.getString("type")).toInt()
+                            val category = args.getString("category").takeUnless { it == "-" }
+                            val model: HomeViewModel = viewModel(factory = remember(repository, from, through, type, category) {
+                                viewModelFactory { initializer { HomeViewModel(repository, SearchDraft(open = true, fromDate = from,
+                                    throughDate = through, type = type, categoryId = category)) } }
+                            })
+                            HomeScreen(model, snackbar, onEdit = { navigation.navigate("edit/$it") }, onCopy = { navigation.navigate("copy/$it") })
                         }
                         composable("category") {
                             val model: CategoryViewModel = viewModel(factory = remember(repository) {
@@ -333,15 +360,22 @@ fun LedgerApp(
                             onExport = onExport, onRestore = onImport,
                             onUpdate = onUpdate, onNotifications = onNotifications, onShortcut = onShortcut,
                             onRecycle = { navigation.navigate("recycle") },
+                            onFinanceExport = { navigation.navigate("finance-export") },
                             onCaptureAccess = onCaptureAccess)
                     }
                     composable("recycle") { RecycleScreen(recycleRepository, memoMode) }
                     if (!memoMode) {
+                        composable("finance-export") {
+                            val model: FinanceExportViewModel = viewModel(factory = remember(repository) {
+                                viewModelFactory { initializer { FinanceExportViewModel(repository, createSavedStateHandle()) } }
+                            })
+                            FinanceExportScreen(model) { entrySaving = it }
+                        }
                         composable("planning") {
                             val model: PlanningViewModel = viewModel(factory = remember(planningRepository, repository) {
                                 viewModelFactory { initializer { PlanningViewModel(planningRepository, repository, createSavedStateHandle()) } }
                             })
-                            PlanningScreen(model)
+                            PlanningScreen(model) { openEntries(ReportRange(it.atDay(1), it.atEndOfMonth()), EXPENSE) }
                         }
                         composable("capture") {
                             CaptureScreen(captureRepository) { input ->
@@ -406,17 +440,20 @@ fun LedgerApp(
                         }
                     }
                     if (memoMode) {
-                        composable("life") {
+                        composable("life?section={section}&focusTitle={focusTitle}&review={review}", arguments = listOf(
+                            navArgument("section") { defaultValue = "日常" }, navArgument("focusTitle") { defaultValue = "" },
+                            navArgument("review") { type = NavType.BoolType; defaultValue = false })) { entry ->
                             val model: LifeViewModel = viewModel(factory = remember(lifeRepository) {
                                 viewModelFactory { initializer { LifeViewModel(lifeRepository, createSavedStateHandle()) } }
                             })
-                            LifeScreen(model)
+                            LifeScreen(model, entry.arguments?.getString("section") ?: "日常", entry.arguments?.getString("focusTitle").orEmpty(), entry.arguments?.getBoolean("review") == true)
                         }
                         composable("tasks") {
                             val model: MemosViewModel = viewModel(factory = remember(memoRepository) {
-                                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle().apply { set("kind", "todo") }) } }
+                                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle().apply { set("kind", "todo") }, lifeRepository) } }
                             })
-                            MemosScreen(model, onAdd = { kind -> navigation.navigate(if (kind == "todo") "memo/task" else "memo/add") }, onEdit = { navigation.navigate("memo/edit/$it") })
+                            MemosScreen(model, onAdd = { kind -> navigation.navigate(if (kind == "todo") "memo/task" else "memo/add") }, onEdit = { navigation.navigate("memo/edit/$it") },
+                                onLife = { openLife(it) }, onFocus = { openLife("focus", it) })
                         }
                         composable("memo/task") {
                             val model: MemoEditorViewModel = viewModel(factory = remember(memoRepository) {
@@ -426,9 +463,10 @@ fun LedgerApp(
                         }
                         composable("memos") {
                             val model: MemosViewModel = viewModel(factory = remember(memoRepository) {
-                                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle()) } }
+                                viewModelFactory { initializer { MemosViewModel(memoRepository, createSavedStateHandle(), lifeRepository) } }
                             })
-                            MemosScreen(model, onAdd = { kind -> navigation.navigate(if (kind == "todo") "memo/task" else "memo/add") }, onEdit = { navigation.navigate("memo/edit/$it") })
+                            MemosScreen(model, onAdd = { kind -> navigation.navigate(if (kind == "todo") "memo/task" else "memo/add") }, onEdit = { navigation.navigate("memo/edit/$it") },
+                                onLife = { openLife(it) }, onFocus = { openLife("focus", it) })
                         }
                         composable("memo/add") {
                             val model: MemoEditorViewModel = viewModel(factory = remember(memoRepository) {

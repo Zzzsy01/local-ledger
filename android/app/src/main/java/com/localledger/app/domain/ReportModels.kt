@@ -58,6 +58,16 @@ fun previousReportRange(period: ReportPeriod, range: ReportRange): ReportRange =
 
 data class ReportPoint(val date: LocalDate, val summary: MonthlySummary)
 
+data class MonthComparison(val current: ReportRange, val previous: ReportRange)
+
+fun monthComparison(month: YearMonth, today: LocalDate): MonthComparison? {
+    if (month != YearMonth.from(today)) return null
+    val previous = month.minusMonths(1)
+    val days = minOf(today.dayOfMonth, previous.lengthOfMonth())
+    return MonthComparison(ReportRange(month.atDay(1), month.atDay(days)),
+        ReportRange(previous.atDay(1), previous.atDay(days)))
+}
+
 // Group by local calendar dates, never by a fixed 24-hour duration (DST can shorten or lengthen a day).
 fun reportPoints(entries: List<LedgerEntry>, range: ReportRange, zone: ZoneId, monthly: Boolean): List<ReportPoint> {
     val matching = entries.filter {

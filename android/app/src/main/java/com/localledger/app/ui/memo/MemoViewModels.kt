@@ -5,6 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.localledger.app.data.repository.MemoRepository
 import com.localledger.app.domain.Memo
+import com.localledger.app.domain.FocusSession
+import com.localledger.app.domain.FocusStatus
+import com.localledger.app.domain.LifeKind
+import com.localledger.app.data.repository.LifeRepository
+import java.time.LocalDate
 import com.localledger.app.ui.common.displayMessage
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,7 +20,19 @@ data class MemosState(
     val folders: List<String> = emptyList(),
 )
 
-class MemosViewModel(private val repository: MemoRepository, private val savedState: SavedStateHandle) : ViewModel() {
+data class TodayState(val date: LocalDate = LocalDate.now(), val tasks: List<Memo> = emptyList(), val habits: Int = 0,
+    val dueCards: Int = 0, val focus: FocusSession? = null, val loading: Boolean = true, val error: String? = null)
+
+class MemosViewModel(private val repository: MemoRepository, private val savedState: SavedStateHandle, life: LifeRepository) : ViewModel() {
+    private val todayDate = MutableStateFlow(LocalDate.now())
+    val today = combine(repository.memos, life.items, life.studyCards, life.focusSessions, todayDate) { memos, items, cards, focus, date ->
+        TodayState(date, memos.filter { !it.isDeleted && it.kind == "todo" && !it.isDone && it.dueEpochDay != null && it.dueEpochDay <= date.toEpochDay() }
+            .sortedWith(compareBy<Memo> { it.dueEpochDay }.thenBy { it.createdAt }),
+            items.count { !it.isDeleted && it.kind == LifeKind.HABIT && it.dateEpochDay <= date.toEpochDay() },
+            cards.count { !it.isDeleted && it.dueEpochDay <= date.toEpochDay() }, focus.firstOrNull { !it.isDeleted && it.status != FocusStatus.COMPLETED }, loading = false)
+    }.catch { emit(TodayState(loading = false, error = it.displayMessage())) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayState())
+    fun refreshToday() { todayDate.value = LocalDate.now() }
     val query = savedState.getStateFlow("query", "")
     val filter = savedState.getStateFlow("filter", "all")
     val kind = savedState.getStateFlow("kind", "note")

@@ -34,7 +34,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
+fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit, onEntries: (ReportRange, Int, String?) -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.refreshTimeZone() }
     var customOpen by rememberSaveable { mutableStateOf(false) }
@@ -72,12 +72,32 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
         if (state.loading) item { Loading() }
         state.error?.let { error -> item { Message(error, isError = true) } }
         if (!state.loading && state.error == null) {
+            state.toDate?.let { elapsed -> item { ReportCard("本月截至今天") {
+                val amount = if (state.type == INCOME) elapsed.income else elapsed.expense
+                val comparison = requireNotNull(state.comparison)
+                val current = if (state.type == INCOME) state.comparisonCurrent.income else state.comparisonCurrent.expense
+                val prior = if (state.type == INCOME) state.comparisonPrevious.income else state.comparisonPrevious.expense
+                Text("${state.range.from} — ${state.today} · ${state.today.dayOfMonth} 个自然日", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OverviewValue("已记${kind}", amount, Modifier.weight(1f))
+                    OverviewValue("截至今天日均${kind}", averageMinor(amount, state.today.dayOfMonth.toLong()), Modifier.weight(1f))
+                }
+                Text("同进度比较：${comparison.current.from} — ${comparison.current.through}\n对照：${comparison.previous.from} — ${comparison.previous.through}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OverviewValue("同进度${kind}差额", current - prior, Modifier.fillMaxWidth())
+                if (comparison.current.through != state.today) Text("上月较短，两边均比较前 ${comparison.current.days} 天。", style = MaterialTheme.typography.bodySmall)
+                Text("日均按自然日计算，不代表每天都已记全。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } } }
             item { ReportOverview(state) }
             item { ReportCard("${kind}趋势") {
                 Text(if (state.monthlyPoints) "按月汇总 · 点选图表查看金额" else "按日汇总 · 点选图表查看金额",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TimelineChart(state.points.map { point -> ChartValue(point.date.format(DateTimeFormatter.ofPattern(
-                    if (state.monthlyPoints) "yyyy/M" else "M/d")), if (state.type == INCOME) point.summary.income else point.summary.expense) })
+                    if (state.monthlyPoints) "yyyy/M" else "M/d")), if (state.type == INCOME) point.summary.income else point.summary.expense) }, onDetails = { index ->
+                    val date = state.points[index].date
+                    val through = if (state.monthlyPoints) java.time.YearMonth.from(date).atEndOfMonth() else date
+                    onEntries(ReportRange(maxOf(date, state.range.from), minOf(through, state.range.through)), state.type, null)
+                })
             } }
             item { ReportCard("本期小结") {
                 val top = state.categories.firstOrNull()
@@ -107,12 +127,15 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } }
-            item { ReportCard("${kind}分类构成") { CategoryRing(state.categories, total) } }
+            item { ReportCard("${kind}分类构成") { CategoryRing(state.categories, total) { onEntries(state.range, state.type, it) } } }
             item { ReportCard(if (state.period == ReportPeriod.YEAR) "全年月度${kind}对比" else "近六个月${kind}对比") {
                 if (state.period != ReportPeriod.YEAR) Text("按完整自然月统计，包含所选区间之外的账目。", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TimelineChart(state.trend.map { month -> ChartValue("${month.month.monthValue}月",
-                    if (state.type == INCOME) month.summary.income else month.summary.expense) }, bars = true)
+                    if (state.type == INCOME) month.summary.income else month.summary.expense) }, bars = true, onDetails = { index ->
+                    val month = state.trend[index].month
+                    onEntries(ReportRange(month.atDay(1), month.atEndOfMonth()), state.type, null)
+                })
             } }
             item { ReportCard("账户${kind}分布") {
                 if (state.accounts.isEmpty()) Text("这个周期还没有记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -139,6 +162,8 @@ fun StatsScreen(model: StatsViewModel, onEdit: (String) -> Unit) {
                         val date = Instant.ofEpochMilli(entry.transaction.occurredAt).atZone(ZoneId.systemDefault())
                             .format(DateTimeFormatter.ofPattern("yyyy/M/d HH:mm"))
                         Text("$date · ${entry.accountName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        entry.transaction.merchant?.takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium) }
                         entry.transaction.note?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }

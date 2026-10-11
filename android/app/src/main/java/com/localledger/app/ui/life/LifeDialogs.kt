@@ -113,8 +113,8 @@ internal fun LifeDeleteDialog(title: String, busy: Boolean, error: String?, onDi
 }
 
 @Composable
-internal fun FocusCreateDialog(busy: Boolean, error: String?, dismiss: () -> Unit, save: (String, String) -> Unit) {
-    var title by rememberSaveable { mutableStateOf("") }
+internal fun FocusCreateDialog(busy: Boolean, error: String?, dismiss: () -> Unit, initialTitle: String = "", save: (String, String) -> Unit) {
+    var title by rememberSaveable { mutableStateOf(initialTitle) }
     var minutes by rememberSaveable { mutableStateOf("25") }
     LifeFormDialog("开始专注", busy, error, dismiss, { save(title, minutes) }) {
         LifeText("这次专注什么？", title, busy) { title = it }

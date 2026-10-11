@@ -23,6 +23,9 @@ data class StatsState(
     val previous: MonthlySummary = MonthlySummary(), val yearAgo: MonthlySummary = MonthlySummary(),
     val trend: List<MonthTotal> = emptyList(), val points: List<ReportPoint> = emptyList(),
     val ranking: List<LedgerEntry> = emptyList(), val loading: Boolean = true, val error: String? = null,
+    val today: LocalDate = LocalDate.now(), val toDate: MonthlySummary? = null,
+    val comparison: MonthComparison? = null, val comparisonCurrent: MonthlySummary = MonthlySummary(),
+    val comparisonPrevious: MonthlySummary = MonthlySummary(),
 ) {
     val monthlyPoints: Boolean get() = period == ReportPeriod.YEAR || range.days > 62
     val previousLabel: String get() = when (period) {
@@ -41,11 +44,18 @@ class StatsViewModel(repository: LedgerRepository, private val savedState: Saved
     ))
     private val type = savedState.getStateFlow("type", EXPENSE)
     private val zone = MutableStateFlow(ZoneId.systemDefault())
-    val state = combine(selection, type, zone) { selected, kind, currentZone ->
-        StatsState(period = selected.period, type = kind, range = reportRange(selected.period, selected.anchor, selected.custom)) to currentZone
+    private val today = MutableStateFlow(LocalDate.now())
+    val state = combine(selection, type, zone, today) { selected, kind, currentZone, date ->
+        StatsState(period = selected.period, type = kind, range = reportRange(selected.period, selected.anchor, selected.custom), today = date) to currentZone
     }
         .flatMapLatest { (initial, currentZone) ->
             val range = initial.range
+            val comparison = if (initial.period == ReportPeriod.MONTH) monthComparison(YearMonth.from(range.from), initial.today) else null
+            val progress = if (comparison == null) flowOf(MonthlySummary() to MonthlySummary()) else {
+                val (currentStart, currentEnd) = comparison.current.bounds(currentZone)
+                val (priorStart, priorEnd) = comparison.previous.bounds(currentZone)
+                combine(repository.summary(currentStart, currentEnd), repository.summary(priorStart, priorEnd)) { current, prior -> current to prior }
+            }
             val (start, end) = range.bounds(currentZone)
             val (previousStart, previousEnd) = previousReportRange(initial.period, range).bounds(currentZone)
             val yearAgo = if (initial.period in listOf(ReportPeriod.MONTH, ReportPeriod.YEAR)) {
@@ -65,13 +75,19 @@ class StatsViewModel(repository: LedgerRepository, private val savedState: Saved
             }
             combine(report, repository.summary(previousStart, previousEnd), yearAgo, trend, repository.entries(start, end)) {
                     data, previous, priorYear, totals, entries ->
-                data.copy(previous = previous, yearAgo = priorYear, trend = totals,
+                val throughToday = initial.today.plusDays(1).atStartOfDay(currentZone).toInstant().toEpochMilli()
+                val elapsedEntries = entries.filter { it.transaction.occurredAt < throughToday }
+                data.copy(previous = previous, yearAgo = priorYear, trend = totals, comparison = comparison,
+                    toDate = if (comparison == null) null else MonthlySummary(
+                        elapsedEntries.filter { it.transaction.type == INCOME }.sumOf { it.transaction.amountMinor },
+                        elapsedEntries.filter { it.transaction.type == EXPENSE }.sumOf { it.transaction.amountMinor }),
                     points = reportPoints(entries, range, currentZone, initial.monthlyPoints),
                     ranking = entries.filter { it.transaction.type == initial.type }
                         .sortedWith(compareByDescending<LedgerEntry> { it.transaction.amountMinor }
                             .thenByDescending { it.transaction.occurredAt }.thenBy { it.transaction.id }).take(10),
                     loading = false)
-            }.onStart { emit(initial) }.catch { emit(initial.copy(loading = false, error = it.displayMessage())) }
+            }.combine(progress) { data, totals -> data.copy(comparisonCurrent = totals.first, comparisonPrevious = totals.second) }
+                .catch { emit(initial.copy(loading = false, error = it.displayMessage())) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsState())
 
     fun changePeriod(offset: Long) {
@@ -96,5 +112,5 @@ class StatsViewModel(repository: LedgerRepository, private val savedState: Saved
         selection.value = value
     }
     fun setType(value: Int) { require(value == EXPENSE || value == INCOME); savedState["type"] = value }
-    fun refreshTimeZone() { zone.value = ZoneId.systemDefault() }
+    fun refreshTimeZone() { zone.value = ZoneId.systemDefault(); today.value = LocalDate.now() }
 }

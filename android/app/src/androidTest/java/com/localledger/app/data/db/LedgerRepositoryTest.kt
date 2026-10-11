@@ -3,6 +3,10 @@ package com.localledger.app.data.db
 import android.content.Context
 import android.net.Uri
 import androidx.room.Room
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
+import com.localledger.app.ui.add.EntryViewModel
+import com.localledger.app.ui.stats.StatsViewModel
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.localledger.app.data.backup.BackupFiles
@@ -18,6 +22,9 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -28,6 +35,51 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LedgerRepositoryTest {
+    @Test fun reportResubscriptionRetainsContentUntilFreshDataArrives() = runBlocking<Unit> {
+        val time = System.currentTimeMillis()
+        val id = repository.saveTransaction(null, 1200, EXPENSE, expense.id, account.id, null, time)
+        val store = ViewModelStore()
+        val model = withContext(Dispatchers.Main) { StatsViewModel(repository, SavedStateHandle()).also { store.put("stats", it) } }
+        try {
+            withTimeout(5_000) { model.state.first { !it.loading } }
+            kotlinx.coroutines.delay(5_500)
+            repository.saveTransaction(id, 1300, EXPENSE, expense.id, account.id, null, time)
+            withTimeout(5_000) { model.state.first {
+                assertFalse(it.loading)
+                assertTrue(it.points.isNotEmpty())
+                it.summary.expense == 1300L
+            } }
+        } finally { withContext(Dispatchers.Main) { store.clear() } }
+    }
+
+    @Test fun continuousEntryKeepsDateRejectsDoubleTapAndPreservesFailedDraft() = runBlocking {
+        val saved = SavedStateHandle()
+        val store = ViewModelStore()
+        val date = java.time.LocalDate.of(2026, 1, 9)
+        val model = withContext(Dispatchers.Main) {
+            EntryViewModel(repository, saved, null).also { store.put("entry", it) }
+        }
+        try {
+            withContext(Dispatchers.Main) {
+                model.setCategory(expense.id); model.setAccount(account.id); model.setDate(date)
+                model.setAmount("12.34"); model.save(true); model.save(true)
+            }
+            withTimeout(5_000) { model.state.first { it.draft.notice != null } }
+            assertEquals("", saved.get<String>("amount"))
+            assertEquals(date.toString(), saved.get<String>("date"))
+            assertEquals(1, repository.entries(0, Long.MAX_VALUE).first().size)
+            withContext(Dispatchers.Main) { model.setAmount("invalid"); model.save(true) }
+            val failed = withTimeout(5_000) { model.state.first { it.draft.error != null } }
+            assertEquals("invalid", failed.draft.amount)
+            assertEquals(1, repository.entries(0, Long.MAX_VALUE).first().size)
+            withContext(Dispatchers.Main) { model.setAmount("12.34"); model.save(true) }
+            withTimeout(5_000) { model.state.first { it.draft.amount.isEmpty() && it.draft.notice != null } }
+            val entries = repository.entries(0, Long.MAX_VALUE).first()
+            assertEquals(2, entries.size)
+            assertEquals(2, entries.map { it.transaction.id }.distinct().size)
+            assertTrue(entries.all { java.time.Instant.ofEpochMilli(it.transaction.occurredAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == date })
+        } finally { withContext(Dispatchers.Main) { store.clear() } }
+    }
     private lateinit var db: LedgerDatabase
     private lateinit var repository: LedgerRepository
     private lateinit var expense: Category

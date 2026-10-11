@@ -26,7 +26,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 @Composable
-fun PlanningScreen(model: PlanningViewModel) {
+fun PlanningScreen(model: PlanningViewModel, onEntries: (java.time.YearMonth) -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
@@ -50,7 +50,7 @@ fun PlanningScreen(model: PlanningViewModel) {
                     else {
                         Text("预算 ¥${visibleAmount(budget.amountMinor)}", style = MaterialTheme.typography.titleMedium)
                         Text("已用 ¥${visibleAmount(state.month.expense)} · 剩余 ¥${visibleAmount(budget.amountMinor - state.month.expense)}")
-                        LinearProgressIndicator(progress = { (state.month.expense.toDouble() / budget.amountMinor).coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
+                        BudgetProgress(state.month.month, budget.amountMinor, state.month.expense) { onEntries(state.month.month) }
                         if (state.month.expense > budget.amountMinor) Text("已超出预算 ¥${visibleAmount(state.month.expense - budget.amountMinor)}", color = MaterialTheme.colorScheme.error)
                     }
                     Row {

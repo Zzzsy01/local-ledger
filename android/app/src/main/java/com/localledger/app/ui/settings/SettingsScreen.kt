@@ -26,6 +26,7 @@ fun SettingsScreen(
     onExport: () -> Unit, onRestore: () -> Unit, onUpdate: () -> Unit,
     onNotifications: () -> Unit, onShortcut: (String) -> Unit,
     onRecycle: () -> Unit = {}, onCaptureAccess: () -> Unit = {},
+    onFinanceExport: () -> Unit = {},
 ) {
     val settings by model.settings.collectAsStateWithLifecycle()
     val error by model.error.collectAsStateWithLifecycle()
@@ -76,6 +77,13 @@ fun SettingsScreen(
         item { SectionTitle("数据与备份") }
         item { SettingsCard {
             SettingsLink("导出完整备份", if (memoMode) "保存备忘录、心愿及全部本机数据" else "保存账目、物品及全部本机数据", onExport)
+            Text(if (settings.lastBackupAt == 0L) "尚未记录成功导出，请定期另存备份。" else "上次成功导出：" +
+                java.time.Instant.ofEpochMilli(settings.lastBackupAt).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!memoMode) {
+                SettingsDivider()
+                SettingsLink("导出财务分析数据", "选择范围，只导出财务 JSON 或流水 CSV", onFinanceExport)
+            }
             SettingsDivider()
             SettingsLink("恢复完整备份", "确认后替换当前全部数据", onRestore)
             SettingsDivider()

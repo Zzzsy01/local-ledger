@@ -255,6 +255,17 @@ class LedgerRepository(
 
     suspend fun exportBackup(uri: Uri) = backupFiles.write(uri, snapshot())
 
+    suspend fun exportFinance(uri: Uri, range: com.localledger.app.domain.ReportRange, csv: Boolean) {
+        require(!range.from.isBefore(java.time.LocalDate.of(1970, 1, 1))) { "请选择 1970 年以后的日期。" }
+        val data = db.withTransaction {
+            com.localledger.app.domain.FinanceExport(range, System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+                dao.allCategories().map { it.toDomain() }, dao.allAccounts().map { it.toDomain() },
+                dao.allTransactions().filterNot { it.isDeleted }.map { it.toDomain() },
+                db.planningDao().allBudgets().map { it.toDomain() }, db.planningDao().allRules().map { it.toDomain() })
+        }
+        backupFiles.writeFinance(uri, data, csv)
+    }
+
     suspend fun readBackup(uri: Uri): LedgerSnapshot = backupFiles.read(uri)
 
     private companion object { const val LAST_ACCOUNT_ID = "last_account_id" }

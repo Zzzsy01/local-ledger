@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -34,7 +35,7 @@ import kotlin.math.roundToInt
 internal data class ChartValue(val label: String, val amount: Long)
 
 @Composable
-internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false) {
+internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false, onDetails: ((Int) -> Unit)? = null) {
     val hidden = LocalHideAmounts.current
     if (hidden) {
         Text("金额已隐藏，关闭隐藏金额后可查看图表。", Modifier.padding(vertical = 24.dp),
@@ -42,7 +43,8 @@ internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false) {
         return
     }
     if (values.isEmpty()) return
-    var selected by remember(values) { mutableIntStateOf(values.indexOfLast { it.amount > 0 }.takeIf { it >= 0 } ?: 0) }
+    var selectedIndex by rememberSaveable(values) { mutableIntStateOf(values.indexOfLast { it.amount > 0 }.takeIf { it >= 0 } ?: 0) }
+    val selected = selectedIndex.coerceIn(values.indices)
     val point = values[selected]
     val pointAmount = visibleAmount(point.amount)
     val color = MaterialTheme.colorScheme.primary
@@ -54,8 +56,8 @@ internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false) {
                 Text(point.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("¥$pointAmount", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
-            IconButton(onClick = { selected-- }, enabled = selected > 0) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "上一个数据点") }
-            IconButton(onClick = { selected++ }, enabled = selected < values.lastIndex) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "下一个数据点") }
+            IconButton(onClick = { selectedIndex = selected - 1 }, enabled = selected > 0) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "上一个数据点") }
+            IconButton(onClick = { selectedIndex = selected + 1 }, enabled = selected < values.lastIndex) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "下一个数据点") }
         }
         Canvas(Modifier.fillMaxWidth().height(170.dp)
             .semantics { contentDescription = "${if (bars) "柱状" else "趋势"}图，${point.label}，金额 $pointAmount 元。可用前后按钮查看各数据点。" }
@@ -63,7 +65,7 @@ internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false) {
                 detectTapGestures { tap ->
                     val left = 12.dp.toPx()
                     val width = size.width - left * 2
-                    selected = if (bars) (((tap.x - left) / width) * values.size).toInt().coerceIn(values.indices)
+                    selectedIndex = if (bars) (((tap.x - left) / width) * values.size).toInt().coerceIn(values.indices)
                         else (((tap.x - left) / width) * values.lastIndex).roundToInt().coerceIn(values.indices)
                 }
             }) {
@@ -104,17 +106,18 @@ internal fun TimelineChart(values: List<ChartValue>, bars: Boolean = false) {
                 Text(values[index].label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        onDetails?.let { action -> TextButton(onClick = { action(selected) }) { Text("查看 ${point.label} 明细") } }
     }
 }
 
 @Composable
-internal fun CategoryRing(categories: List<CategoryTotal>, total: Long) {
+internal fun CategoryRing(categories: List<CategoryTotal>, total: Long, onDetails: (String) -> Unit = {}) {
     if (categories.isEmpty()) { Text("这个周期还没有记录", color = MaterialTheme.colorScheme.onSurfaceVariant); return }
     val hidden = LocalHideAmounts.current
     val palette = listOf(MaterialTheme.colorScheme.primary, Color(0xFF69A8EE), Color(0xFF39B7B7),
         Color(0xFFB098E5), Color(0xFFE5AD6B), MaterialTheme.colorScheme.secondary)
-    var selectedId by remember(categories) { mutableStateOf(categories.first().categoryId) }
-    val selected = categories.first { it.categoryId == selectedId }
+    var selectedId by rememberSaveable(categories) { mutableStateOf(categories.first().categoryId) }
+    val selected = categories.firstOrNull { it.categoryId == selectedId } ?: categories.first()
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (!hidden) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(184.dp).semantics { contentDescription = "分类占比图，${selected.name}，${reportPercentage(selected.total, total)}" }) {
@@ -134,6 +137,7 @@ internal fun CategoryRing(categories: List<CategoryTotal>, total: Long) {
                 Text(selected.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        TextButton(onClick = { onDetails(selected.categoryId) }) { Text("查看「${selected.name}」明细") }
         categories.forEachIndexed { index, category ->
             Surface(onClick = { selectedId = category.categoryId }, color = if (selectedId == category.categoryId)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = .5f) else Color.Transparent,

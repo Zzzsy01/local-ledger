@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Checkbox
@@ -56,6 +60,7 @@ import java.time.LocalDate
 fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, onSaved: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val draft = state.draft
+    var moreOpen by rememberSaveable { mutableStateOf(draft.location.isNotBlank() || draft.isReimbursable) }
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -152,14 +157,25 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
                 }
             }
             item {
-                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(draft.merchant, model::setMerchant, Modifier.weight(1f), label = { Text("商家（选填）") },
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(draft.merchant, model::setMerchant, Modifier.fillMaxWidth(), label = { Text("商家／用途（选填）") },
                         enabled = !draft.loading && !draft.saving, singleLine = true)
-                    OutlinedTextField(draft.location, model::setLocation, Modifier.weight(1f), label = { Text("地点（选填）") },
-                        enabled = !draft.loading && !draft.saving, singleLine = true)
+                    if (!draft.loading && state.suggestions.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        state.suggestions.forEach { entry -> SuggestionChip(onClick = { model.chooseSuggestion(entry) }, enabled = !draft.saving,
+                            label = { Text(entry.transaction.merchant.orEmpty(), maxLines = 1) }) }
+                    }
                 }
             }
-            if (draft.type == EXPENSE) item {
+            item {
+                TextButton(onClick = { moreOpen = !moreOpen }, modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text(if (moreOpen) "收起地点与报销" else "更多内容" + if (draft.location.isNotBlank() || draft.isReimbursable) " · 已填写" else " · 地点与报销")
+                }
+            }
+            if (moreOpen) item {
+                OutlinedTextField(draft.location, model::setLocation, Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    label = { Text("地点（选填）") }, enabled = !draft.loading && !draft.saving, singleLine = true)
+            }
+            if (moreOpen && draft.type == EXPENSE) item {
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(draft.isReimbursable, model::setReimbursable, enabled = !draft.loading && !draft.saving)
@@ -182,13 +198,19 @@ fun EntryScreen(model: EntryViewModel, onSavingChanged: (Boolean) -> Unit = {}, 
             Text(error, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        Button(onClick = model::save, enabled = !draft.loading && !draft.saving && !draft.saved,
-            modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp)) {
+        draft.notice?.let { Text(it, Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodySmall) }
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (model.canContinue) OutlinedButton(onClick = { model.save(continueEntry = true) }, enabled = !draft.loading && !draft.saving && !draft.saved,
+            modifier = Modifier.weight(1f).heightIn(min = 52.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) { Text("保存并继续") }
+        Button(onClick = { model.save() }, enabled = !draft.loading && !draft.saving && !draft.saved,
+            modifier = Modifier.weight(1f).heightIn(min = 52.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) {
             if (draft.saving) {
                 CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
             }
             Text(if (draft.saving) "保存中…" else "保存账目")
+        }
         }
     }
 }

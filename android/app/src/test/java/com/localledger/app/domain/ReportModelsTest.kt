@@ -8,6 +8,16 @@ import java.time.ZoneId
 import java.time.Duration
 
 class ReportModelsTest {
+    @org.junit.Test fun monthProgressUsesEqualDaysAcrossShortMonthsAndYearBoundary() {
+        val date = java.time.LocalDate.of(2026, 3, 31)
+        val comparison = requireNotNull(monthComparison(java.time.YearMonth.of(2026, 3), date))
+        org.junit.Assert.assertEquals(java.time.LocalDate.of(2026, 3, 28), comparison.current.through)
+        org.junit.Assert.assertEquals(java.time.LocalDate.of(2026, 2, 28), comparison.previous.through)
+        org.junit.Assert.assertEquals(comparison.current.days, comparison.previous.days)
+        val january = requireNotNull(monthComparison(java.time.YearMonth.of(2026, 1), java.time.LocalDate.of(2026, 1, 11)))
+        org.junit.Assert.assertEquals(java.time.LocalDate.of(2025, 12, 11), january.previous.through)
+        org.junit.Assert.assertNull(monthComparison(java.time.YearMonth.of(2026, 2), date))
+    }
     @Test fun comparisonsAndAverageStayExactAtLongBoundaries() {
         assertEquals("+25.0%", percentageChange(125, 100))
         assertEquals("-100.0%", percentageChange(0, 100))

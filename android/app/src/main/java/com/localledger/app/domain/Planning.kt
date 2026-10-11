@@ -1,12 +1,28 @@
 package com.localledger.app.domain
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
 data class Budget(val month: String, val amountMinor: Long, val updatedAt: Long)
+
+data class BudgetPace(val remainingMinor: Long, val remainingDays: Int, val elapsedDays: Int, val dailyMinor: Long?)
+
+fun budgetPace(month: YearMonth, amountMinor: Long, expenseMinor: Long, today: LocalDate): BudgetPace {
+    require(amountMinor > 0 && expenseMinor >= 0)
+    val elapsed = when {
+        today.isBefore(month.atDay(1)) -> 0
+        today.isAfter(month.atEndOfMonth()) -> month.lengthOfMonth()
+        else -> today.dayOfMonth
+    }
+    val days = if (YearMonth.from(today) == month) month.lengthOfMonth() - today.dayOfMonth + 1 else 0
+    val remaining = amountMinor - expenseMinor
+    // Round down so spending the displayed allowance each day cannot exceed the budget.
+    return BudgetPace(remaining, days, elapsed, if (days > 0 && remaining >= 0) remaining / days else null)
+}
 
 data class RecurringRule(
     val id: String,

@@ -89,7 +89,8 @@ private val dateFormat = DateTimeFormatter.ofPattern("M月d日 E", Locale.CHINA)
 
 @Composable
 fun HomeScreen(model: HomeViewModel, snackbar: SnackbarHostState, onEdit: (String) -> Unit, onCopy: (String) -> Unit = {},
-    onAccounts: () -> Unit = {}, onAddTransaction: () -> Unit = {}, onPlanning: () -> Unit = {}, overview: @Composable () -> Unit = {}) {
+    onAccounts: () -> Unit = {}, onAddTransaction: () -> Unit = {}, onPlanning: () -> Unit = {},
+    onBudgetEntries: (java.time.YearMonth) -> Unit = {}, overview: @Composable () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     var deletion by remember { mutableStateOf<LedgerEntry?>(null) }
     LaunchedEffect(model) {
@@ -113,7 +114,7 @@ fun HomeScreen(model: HomeViewModel, snackbar: SnackbarHostState, onEdit: (Strin
         if (!state.search.open) {
             item { SummaryCard(state.summary, "${state.month.monthValue}月收支概览", Modifier.padding(horizontal = 20.dp)) }
             item { QuickEntries(state, onCopy, onAddTransaction) }
-            item { BudgetCard(state, onPlanning) }
+            item { BudgetCard(state, onPlanning) { onBudgetEntries(state.month) } }
             item { MonthCalendar(state, model::selectDay) }
         }
         item {
@@ -262,7 +263,7 @@ private fun SummaryCard(summary: MonthlySummary, title: String, modifier: Modifi
 }
 
 @Composable
-private fun BudgetCard(state: HomeState, onPlanning: () -> Unit) {
+private fun BudgetCard(state: HomeState, onPlanning: () -> Unit, onEntries: () -> Unit) {
     val budget = state.budget
     val remaining = budget?.let { it.amountMinor - state.monthSummary.expense }
     Card(onClick = onPlanning, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp),
@@ -277,12 +278,7 @@ private fun BudgetCard(state: HomeState, onPlanning: () -> Unit) {
                 }
                 Icon(painterResource(R.drawable.ic_ui_chevron_right), "调整预算", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (budget != null && !com.localledger.app.ui.common.LocalHideAmounts.current) {
-                val progress = (state.monthSummary.expense.toDouble() / budget.amountMinor).toFloat().coerceIn(0f, 1f)
-                Box(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))) {
-                    Box(Modifier.fillMaxWidth(progress).height(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)))
-                }
-            }
+            if (budget != null) com.localledger.app.ui.planning.BudgetProgress(state.month, budget.amountMinor, state.monthSummary.expense, onEntries)
         }
     }
 }
@@ -382,7 +378,7 @@ private fun MonthCalendar(state: HomeState, onSelect: (LocalDate?) -> Unit) {
 @Composable
 private fun SearchPanel(state: HomeState, model: HomeViewModel) {
     val context = LocalContext.current
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(state.search.fromDate != null || state.search.throughDate != null) }
     val draft = state.search
     Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f)),
@@ -392,8 +388,8 @@ private fun SearchPanel(state: HomeState, model: HomeViewModel) {
             label = { Text("搜索备注、商家、地点或账户") }, singleLine = true, shape = RoundedCornerShape(16.dp),
             leadingIcon = { Icon(painterResource(R.drawable.ic_ui_search), contentDescription = null, modifier = Modifier.size(20.dp)) })
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = draft.allDates, onClick = { model.setAllDates(true) }, label = { Text("全部日期") })
-            FilterChip(selected = !draft.allDates, onClick = { model.setAllDates(false) }, label = { Text("所选月份") })
+            FilterChip(selected = draft.allDates && draft.fromDate == null && draft.throughDate == null, onClick = { model.setAllDates(true) }, label = { Text("全部日期") })
+            FilterChip(selected = !draft.allDates && draft.fromDate == null && draft.throughDate == null, onClick = { model.setAllDates(false) }, label = { Text("所选月份") })
             FilterChip(selected = draft.reimbursement == 0, onClick = { model.setReimbursement(if (draft.reimbursement == 0) null else 0) }, label = { Text("待报销") })
             FilterChip(selected = draft.reimbursement == 1, onClick = { model.setReimbursement(if (draft.reimbursement == 1) null else 1) }, label = { Text("已报销") })
             TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "收起" else "更多筛选") }

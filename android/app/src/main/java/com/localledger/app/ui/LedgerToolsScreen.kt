@@ -28,6 +28,7 @@ fun LedgerToolsScreen(open: (String) -> Unit) {
         item { Text("账单整理", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary) }
         item { ToolLink("截图与自动采集", "离线识别截图，核对支付通知", "capture", open) }
         item { ToolLink("导入账单 CSV", "预览微信、支付宝等账单后导入", "import", open) }
+        item { ToolLink("导出财务分析数据", "选择范围，保存财务 JSON 或流水 CSV", "finance-export", open) }
         item { ToolLink("记账分类", "新增、排序、改名和停用分类", "category", open) }
         item { Text("完整备份、隐私、提醒及应用更新在右上角设置。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }

@@ -10,6 +10,7 @@ data class AppSettings(
     val defaultHome: String = "memos", val accent: String = "paper",
     val appLock: Boolean = false,
     val capturePayments: Boolean = false,
+    val lastBackupAt: Long = 0,
 )
 
 class SettingsRepository(context: Context) {
@@ -28,8 +29,14 @@ class SettingsRepository(context: Context) {
         accent = preferences.getString("accent", "paper") ?: "paper",
         appLock = preferences.getBoolean("app-lock", false),
         capturePayments = preferences.getBoolean("capture-payments", false),
+        lastBackupAt = preferences.getLong("last-backup-at", 0),
     ))
     val settings = mutableSettings.asStateFlow()
+    fun backupSaved() {
+        val now = System.currentTimeMillis()
+        preferences.edit().putLong("last-backup-at", now).apply()
+        mutableSettings.value = mutableSettings.value.copy(lastBackupAt = now)
+    }
     fun capturePayments(enabled: Boolean) {
         preferences.edit().putBoolean("capture-payments", enabled).apply()
         mutableSettings.value = mutableSettings.value.copy(capturePayments = enabled)

@@ -21,6 +21,7 @@ data class HostState(
 
 class LedgerHostViewModel(
     private val repository: LedgerRepository,
+    private val settings: com.localledger.app.data.repository.SettingsRepository,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(HostState())
     val state = mutableState.asStateFlow()
@@ -34,6 +35,7 @@ class LedgerHostViewModel(
 
     fun export(uri: Uri) = runOperation {
         repository.exportBackup(uri)
+        settings.backupSaved()
         mutableState.value = mutableState.value.copy(notice = "完整备份已保存。")
     }
 

@@ -56,10 +56,10 @@ data class HomeState(
 data class HomeMessage(val text: String, val undoId: String? = null)
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class HomeViewModel(private val repository: LedgerRepository) : ViewModel() {
+class HomeViewModel(private val repository: LedgerRepository, initialSearch: SearchDraft = SearchDraft()) : ViewModel() {
     private val month = MutableStateFlow(YearMonth.now())
     private val zone = MutableStateFlow(ZoneId.systemDefault())
-    private val search = MutableStateFlow(SearchDraft())
+    private val search = MutableStateFlow(initialSearch)
     private val selectedDay = MutableStateFlow<LocalDate?>(null)
     private val mutableMessages = MutableSharedFlow<HomeMessage>()
     val messages = mutableMessages.asSharedFlow()

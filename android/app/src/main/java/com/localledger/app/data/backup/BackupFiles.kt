@@ -11,6 +11,13 @@ import java.util.UUID
 import android.graphics.BitmapFactory
 
 class BackupFiles(private val resolver: ContentResolver, private val filesDir: File? = null) {
+    suspend fun writeFinance(uri: Uri, data: com.localledger.app.domain.FinanceExport, csv: Boolean) = withContext(Dispatchers.IO) {
+        val text = if (csv) FinanceExportCodec.csv(data) else FinanceExportCodec.encode(data)
+        require(text.length <= MAX_CHARACTERS) { "分析文件超过 64 Mi 个字符，请缩短导出范围。" }
+        val output = requireNotNull(resolver.openOutputStream(uri, "wt")) { "无法打开分析文件。" }
+        output.bufferedWriter(Charsets.UTF_8).use { it.write(text) }
+    }
+
     suspend fun withPhotos(snapshot: LedgerSnapshot): LedgerSnapshot = withContext(Dispatchers.IO) {
         var total = 0L
         val photos = snapshot.assets.flatMap { it.photoPaths }.distinct().associateWith { path ->

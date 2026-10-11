@@ -11,6 +11,7 @@ import com.localledger.app.domain.TRANSFER
 import com.localledger.app.domain.TRANSFER_CATEGORY_ID
 import com.localledger.app.domain.formatAmount
 import com.localledger.app.domain.parseAmount
+import com.localledger.app.domain.LedgerEntry
 import com.localledger.app.ui.common.displayMessage
 import java.time.Instant
 import java.time.LocalDate
@@ -43,11 +44,13 @@ data class EntryDraft(
     val location: String = "",
     val isReimbursable: Boolean = false,
     val reimbursementStatus: Int = 0,
+    val notice: String? = null,
 )
 data class EntryState(
     val draft: EntryDraft = EntryDraft(),
     val categories: List<Category> = emptyList(),
     val accounts: List<Account> = emptyList(),
+    val suggestions: List<LedgerEntry> = emptyList(),
 )
 
 class EntryViewModel(
@@ -57,6 +60,9 @@ class EntryViewModel(
     private val copyFromId: String? = null,
 ) : ViewModel() {
     val copying: Boolean = copyFromId != null
+    val canContinue: Boolean = id == null && savedState.get<String>("captureKey") == null && savedState.get<Int>("captureSource") == null
+    private var categoryChosen = savedState.get<Boolean>("categoryChosen") ?: false
+    private var accountChosen = savedState.get<Boolean>("accountChosen") ?: false
     private val restored = savedState.get<Boolean>("loaded") == true
     private val draft = MutableStateFlow(EntryDraft(
         amount = savedState["amount"] ?: "",
@@ -71,7 +77,16 @@ class EntryViewModel(
         reimbursementStatus = savedState["reimbursementStatus"] ?: 0,
         loading = (id != null || copyFromId != null) && !restored,
     ))
-    val state = combine(draft, repository.categories, repository.accounts, ::EntryState)
+    val state = combine(draft, repository.categories, repository.accounts, repository.entries(0, Long.MAX_VALUE)) { value, categories, accounts, entries ->
+        val suggestions = entries.asSequence().filter {
+            val row = it.transaction
+            row.type == value.type && !row.merchant.isNullOrBlank() &&
+                (value.merchant.isBlank() || row.merchant.contains(value.merchant, ignoreCase = true)) &&
+                categories.any { category -> category.id == row.categoryId && !category.isDeleted } &&
+                accounts.any { account -> account.id == row.accountId && !account.isDeleted }
+        }.distinctBy { it.transaction.merchant!!.lowercase(java.util.Locale.ROOT) }.take(5).toList()
+        EntryState(value, categories, accounts, suggestions)
+    }
         .catch { emit(EntryState(draft.value.copy(error = it.displayMessage(), loading = false))) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EntryState(draft.value))
 
@@ -132,8 +147,8 @@ class EntryViewModel(
     fun setType(value: Int) { if (value != draft.value.type) change { it.copy(type = value,
         categoryId = if (value == TRANSFER) TRANSFER_CATEGORY_ID else null, transferAccountId = null,
         isReimbursable = false, reimbursementStatus = 0) } }
-    fun setCategory(value: String) { change { it.copy(categoryId = value) } }
-    fun setAccount(value: String) { change { it.copy(accountId = value, transferAccountId = it.transferAccountId.takeUnless { id -> id == value }) } }
+    fun setCategory(value: String) { categoryChosen = true; savedState["categoryChosen"] = true; change { it.copy(categoryId = value) } }
+    fun setAccount(value: String) { accountChosen = true; savedState["accountChosen"] = true; change { it.copy(accountId = value, transferAccountId = it.transferAccountId.takeUnless { id -> id == value }) } }
     fun setTransferAccount(value: String) { change { it.copy(transferAccountId = value) } }
     fun setMerchant(value: String) { change { it.copy(merchant = value) } }
     fun setLocation(value: String) { change { it.copy(location = value) } }
@@ -142,7 +157,15 @@ class EntryViewModel(
     fun setNote(value: String) { change { it.copy(note = value) } }
     fun setDate(value: LocalDate) { change { it.copy(date = value) } }
 
-    fun save() {
+    fun chooseSuggestion(entry: LedgerEntry) {
+        val row = entry.transaction
+        change { it.copy(merchant = row.merchant.orEmpty(),
+            categoryId = if (!categoryChosen && id == null && !copying && row.type != TRANSFER) row.categoryId else it.categoryId,
+            accountId = if (!accountChosen && id == null && !copying && row.type != TRANSFER) row.accountId else it.accountId) }
+    }
+
+    fun save(continueEntry: Boolean = false) {
+        if (continueEntry && !canContinue) return
         val value = draft.value
         if (value.saving || value.loading || value.saved) return
         val amount = parseAmount(value.amount)
@@ -166,7 +189,9 @@ class EntryViewModel(
                     transferAccountId = value.transferAccountId, merchant = value.merchant, location = value.location,
                     isReimbursable = value.isReimbursable, reimbursementStatus = value.reimbursementStatus,
                     source = savedState["captureSource"] ?: 0, importKey = savedState["captureKey"], captureCandidateId = savedState["captureId"])
-                draft.update { it.copy(saving = false, saved = true) }
+                if (continueEntry) change { EntryDraft(type = it.type, categoryId = it.categoryId, accountId = it.accountId,
+                    transferAccountId = it.transferAccountId, date = it.date, notice = "已保存，可继续记下一笔") }
+                else draft.update { it.copy(saving = false, saved = true) }
             } catch (error: Exception) { draft.update { it.copy(saving = false, error = error.displayMessage()) } }
         }
     }
