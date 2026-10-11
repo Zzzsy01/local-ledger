@@ -1,6 +1,6 @@
 # 应用更新发布
 
-源码与发行安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。当前工程版本 2.0.0（versionCode 13）为本地测试包，尚未发布至 GitHub；此前 1.7.0 的发行记录见 [UI 升级记录](verification/ui-refresh.md)。1.3.1 起预置更新地址：
+源码与发行安装包统一放在 [Zzzsy01/local-ledger](https://github.com/Zzzsy01/local-ledger)。[2.0.0（versionCode 13）](https://github.com/Zzzsy01/local-ledger/releases/tag/v2.0.0) 已于 2026-10-12 发布为最新正式版本，公开更新清单与安装包已下载核对；验证范围见 [2.0.0 验证记录](verification/2.0.0.md)。此前 1.7.0 的发行记录见 [UI 升级记录](verification/ui-refresh.md)。1.3.1 起预置更新地址：
 
 ```text
 https://github.com/Zzzsy01/local-ledger/releases/latest/download/update.json

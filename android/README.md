@@ -2,6 +2,8 @@
 
 Kotlin + Jetpack Compose + Navigation Compose + Room，Android 8.0（API 26）及以上。
 
+当前发行版本：[2.0.0 / 13](https://github.com/Zzzsy01/local-ledger/releases/tag/v2.0.0)，2026-10-12 发布至原应用更新渠道。发布与验证记录见 [2.0.0 验证记录](verification/2.0.0.md)。
+
 无需账号，备忘录、心愿、账目和物品存本机，日常记录离线可用。联网用于可关闭的应用更新检查；闲鱼查询由外部浏览器打开。现有网页票据工具保持独立。1.5.0 新增生活管理、账户余额/转账、离线截图识别、物品照片、桌面待办和应用锁；完整功能及参考对应见 [PDF-INTEGRATION.md](PDF-INTEGRATION.md)。安卓暂不导出票据 PDF。
 
 ## 使用
